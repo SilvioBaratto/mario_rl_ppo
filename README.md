@@ -23,14 +23,15 @@ A production-ready implementation of Proximal Policy Optimization (PPO) for trai
 ### Prerequisites
 - Python 3.8+
 - pip
+- (Optional) Docker and Docker Compose
 - (Optional) CUDA-compatible GPU for faster training
 
-### Setup
+### Setup (Local)
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/reinforcement_learning_mario_bross.git
-cd reinforcement_learning_mario_bross
+git clone https://github.com/yourusername/mario-rl-ppo.git
+cd mario-rl-ppo
 
 # Create virtual environment (recommended)
 python -m venv venv
@@ -40,11 +41,25 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Setup (Docker)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mario-rl-ppo.git
+cd mario-rl-ppo
+
+# Build the Docker image
+docker-compose build
+```
+
 ### Verify Installation
 
 ```bash
-# Quick test run (100k timesteps, 2 environments)
+# Local: Quick test run (100k timesteps, 2 environments)
 python train.py --total-timesteps 100000 --num-envs 2 --exp-name test_run
+
+# Docker: Quick test run
+docker-compose run --rm train python train.py --total-timesteps 100000 --num-envs 2 --exp-name test_run
 ```
 
 ## Quick Start
@@ -383,6 +398,55 @@ for _ in range(1000):
     obs, reward, done, info = env.step(action)
     if done[0]:
         obs = env.reset()
+```
+
+## Docker
+
+### Using Docker Compose
+
+```bash
+# Build the image
+docker-compose build
+
+# Train (default: 10M timesteps)
+docker-compose up train
+
+# Resume training from checkpoint
+docker-compose --profile resume up resume
+
+# Evaluate trained model
+docker-compose --profile eval up evaluate
+
+# Record gameplay video
+docker-compose --profile record up record
+
+# Monitor with TensorBoard (http://localhost:6006)
+docker-compose --profile monitor up tensorboard
+
+# Train + TensorBoard together
+docker-compose --profile monitor up train tensorboard
+
+# Stop all services
+docker-compose down
+```
+
+### Using Docker Directly
+
+```bash
+# Build
+docker build -t mario-rl-ppo .
+
+# Train
+docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
+  python train.py --total-timesteps 10000000 --device cpu --exp-name docker_run
+
+# Evaluate
+docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
+  python evaluate.py --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
+
+# Record video
+docker run --rm -v $(pwd)/runs:/app/runs -v $(pwd)/videos:/app/videos mario-rl-ppo \
+  python play_and_record.py --model-path runs/docker_run/checkpoints/best_model
 ```
 
 ## Experiment Management

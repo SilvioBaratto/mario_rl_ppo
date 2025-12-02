@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Training service
+  train:
+    build: .
+    image: mario-rl-ppo
+    container_name: mario-train
+    volumes:
+      - ./runs:/app/runs
+    environment:
+      - SDL_VIDEODRIVER=dummy
+      - SDL_AUDIODRIVER=dummy
+    command: >
+      python train.py
+        --total-timesteps 10000000
+        --num-envs 8
+        --device cpu
+        --exp-name docker_train
+        --save-freq 250000
+        --eval-freq 100000
+
+  # Resume training from checkpoint
+  resume:
+    build: .
+    image: mario-rl-ppo
+    container_name: mario-resume
+    volumes:
+      - ./runs:/app/runs
+    environment:
+      - SDL_VIDEODRIVER=dummy
+      - SDL_AUDIODRIVER=dummy
+    command: >
+      python train.py
+        --resume runs/docker_train/checkpoints/best_model.zip
+        --total-timesteps 5000000
+        --device cpu
+        --exp-name docker_resumed
+    profiles:
+      - resume
+
+  # Evaluation service
+  evaluate:
+    build: .
+    image: mario-rl-ppo
+    container_name: mario-evaluate
+    volumes:
+      - ./runs:/app/runs
+    environment:
+      - SDL_VIDEODRIVER=dummy
+      - SDL_AUDIODRIVER=dummy
+    command: >
+      python evaluate.py
+        --model-path runs/docker_train/checkpoints/best_model
+        --n-episodes 10
+    profiles:
+      - eval
+
+  # Video recording service
+  record:
+    build: .
+    image: mario-rl-ppo
+    container_name: mario-record
+    volumes:
+      - ./runs:/app/runs
+      - ./videos:/app/videos
+    environment:
+      - SDL_VIDEODRIVER=dummy
+      - SDL_AUDIODRIVER=dummy
+    command: >
+      python play_and_record.py
+        --model-path runs/docker_train/checkpoints/best_model
+    profiles:
+      - record
+
+  # TensorBoard for monitoring
+  tensorboard:
+    image: tensorflow/tensorflow:latest
+    container_name: mario-tensorboard
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./runs:/app/runs:ro
+    command: tensorboard --logdir=/app/runs --host=0.0.0.0
+    profiles:
+      - monitor
+
+# Usage:
+#
+# Build:
+#   docker-compose build
+#
+# Train (default):
+#   docker-compose up train
+#
+# Resume training:
+#   docker-compose --profile resume up resume
+#
+# Evaluate:
+#   docker-compose --profile eval up evaluate
+#
+# Record video:
+#   docker-compose --profile record up record
+#
+# Monitor with TensorBoard:
+#   docker-compose --profile monitor up tensorboard
+#   Then open http://localhost:6006
+#
+# Run multiple services:
+#   docker-compose --profile monitor up train tensorboard
+#
+# Stop all:
+#   docker-compose down
