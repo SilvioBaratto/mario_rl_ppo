@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Training outputs
+runs/
+logs/
+checkpoints/
+models/
+results/
+videos/
+eval_videos/
+*.mp4
+mario_gameplay_*.mp4
+*.pt
+*.pkl
+*.zip
+
+# Claude Code guidance
+CLAUDE.md
+
+# Tensorboard
+events.out.tfevents.*
+
+# Weights & Biases
+wandb/
+
+# Environment
+.env
+.env.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+docs/_build/
+*.pdf
+
+# Misc
+*.log
+*.csv
+*.json
+!package.json
+!configs/*.yaml
+!configs/*.json
