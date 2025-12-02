@@ -130,7 +130,7 @@ python evaluate.py \
 ## Project Structure
 
 ```
-reinforcement_learning_mario_bross/
+mario-rl-ppo/
 ├── src/
 │   ├── agents/
 │   │   ├── __init__.py
@@ -146,13 +146,14 @@ reinforcement_learning_mario_bross/
 │   └── <exp_name>/
 │       ├── checkpoints/          # Model checkpoints
 │       ├── logs/                 # TensorBoard logs
-│       ├── videos/               # Training evaluation videos
-│       └── config.yaml           # Run configuration
+│       └── videos/               # Training evaluation videos
 ├── train.py                      # Main training script
 ├── evaluate.py                   # Evaluation script
+├── play_and_record.py            # Video recording script
 ├── requirements.txt              # Python dependencies
-├── setup.py                      # Package setup
-├── CLAUDE.md                     # Claude Code guidance
+├── Dockerfile                    # Docker image definition
+├── docker-compose.yml            # Docker Compose configuration
+├── .gitignore                    # Git ignore rules
 └── README.md                     # This file
 ```
 
