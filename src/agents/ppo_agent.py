@@ -5,14 +5,14 @@ PPO Agent implementation with custom CNN architecture for Super Mario Bros
 import os
 import torch
 import torch.nn as nn
-from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import numpy as np
 
 
 class MarioCNN(BaseFeaturesExtractor):
-    """Custom CNN feature extractor for Super Mario Bros (Kaggle implementation)"""
+    """Custom CNN feature extractor for Super Mario Bros.
+    """
 
     def __init__(self, observation_space, features_dim=512):
         super().__init__(observation_space, features_dim)
@@ -29,7 +29,6 @@ class MarioCNN(BaseFeaturesExtractor):
             n_input_channels = obs_shape[-1]
             self.is_channels_first = False
 
-        # Kaggle notebook architecture: 4 Conv2d layers with 32 filters each
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
@@ -56,8 +55,18 @@ class MarioCNN(BaseFeaturesExtractor):
         self.linear = nn.Sequential(
             nn.Linear(n_flatten, features_dim),
             nn.ReLU(),
-            nn.Dropout(0.2)
         )
+
+        # Apply orthogonal initialization 
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        """Initialize weights with orthogonal initialization for better training."""
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+                nn.init.orthogonal_(module.weight, nn.init.calculate_gain('relu'))
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
 
     def forward(self, observations):
         if not self.is_channels_first:

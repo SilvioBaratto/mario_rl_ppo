@@ -167,10 +167,11 @@ def main():
     # Load agent with custom CNN
     print(f"Loading model from {args.model_path}...")
 
-    # Set up custom policy kwargs for Kaggle implementation
+    # Set up custom policy kwargs
     policy_kwargs = dict(
         features_extractor_class=MarioCNN,
         features_extractor_kwargs=dict(features_dim=512),
+        normalize_images=False,  # Already normalized to [0,1] in wrapper
     )
 
     custom_objects = {

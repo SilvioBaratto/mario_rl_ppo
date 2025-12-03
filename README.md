@@ -127,6 +127,51 @@ python evaluate.py \
   --n-episodes 5
 ```
 
+### Recording Gameplay Videos
+
+The `play_and_record.py` script provides a simple way to record a single gameplay episode with a trained model.
+
+#### Basic Recording
+```bash
+# Record one game with auto-generated filename
+python play_and_record.py \
+  --model-path runs/my_experiment/checkpoints/best_model
+```
+
+#### Custom Output Path
+```bash
+# Specify output video path
+python play_and_record.py \
+  --model-path runs/my_experiment/checkpoints/best_model \
+  --output my_mario_gameplay.mp4
+```
+
+#### Extended Recording
+```bash
+# Record with higher step limit for longer episodes
+python play_and_record.py \
+  --model-path runs/my_experiment/checkpoints/best_model \
+  --max-steps 10000
+```
+
+#### Recording Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--model-path` | (required) | Path to trained model (.zip file) |
+| `--output` | auto | Output video path (auto-generates timestamp-based name) |
+| `--env-id` | SuperMarioBros-v0 | Environment ID |
+| `--frame-stack` | 4 | Number of frames to stack |
+| `--max-steps` | 5000 | Maximum steps per episode |
+| `--seed` | 42 | Random seed |
+| `--deterministic` | True | Use deterministic policy |
+| `--device` | auto | Device to use (cpu/cuda/mps/auto) |
+
+The script outputs:
+- Real-time progress updates every 100 steps
+- Final game statistics (steps, reward, max distance, completion status)
+- MP4 video at 30 fps with filename indicating completion status
+
 ## Project Structure
 
 ```
@@ -161,46 +206,48 @@ mario-rl-ppo/
 
 ### Custom CNN Feature Extractor
 
-The `MarioCNN` class (src/agents/ppo_agent.py:14-66) implements a custom convolutional neural network optimized for Super Mario Bros:
+The `MarioCNN` class (src/agents/ppo_agent.py:14-73) implements a custom convolutional neural network optimized for Super Mario Bros:
 
-**Architecture** (Kaggle notebook style):
+**Architecture**:
 - **Conv Layer 1**: 32 filters, 3x3 kernel, stride 2, padding 1
 - **Conv Layer 2**: 32 filters, 3x3 kernel, stride 2, padding 1
 - **Conv Layer 3**: 32 filters, 3x3 kernel, stride 2, padding 1
 - **Conv Layer 4**: 32 filters, 3x3 kernel, stride 2, padding 1
-- **FC Layer**: 512 units + Dropout(0.2)
+- **FC Layer**: 512 units
 
 **Key Features**:
+- Orthogonal weight initialization for stable training
 - Automatic channels-first/last format detection
 - Handles both (H, W, C) and (C, H, W) input formats
-- Designed for 4-frame stacked grayscale observations
+- Designed for 4-frame stacked grayscale observations (normalized to [0,1])
 
 ### Environment Preprocessing Pipeline
 
 1. **Base Environment**: `gym-super-mario-bros` (Gym v0.21 API)
 2. **Action Mapping**: `JoypadSpace` with SIMPLE_MOVEMENT (7 discrete actions)
-3. **Reward Scaling**: `NormalizeRewardEnv` (optional scaling)
+3. **Custom Reward Shaping**: `CustomReward` (score bonus, flag/death penalties, /10 scaling)
 4. **Frame Skipping**: `SkipFrame` (skip=4 for temporal abstraction)
 5. **Time Limit**: `TimeLimitWrapper` (max 2000 steps to prevent getting stuck)
 6. **Grayscale Conversion**: `GrayScaleObservation` (keep_dim=True)
 7. **Resize**: `ResizeEnv` (84x84)
-8. **API Compatibility**: `GymV21CompatibilityV0` (Shimmy wrapper)
-9. **Vectorization**: `DummyVecEnv` for parallel environments
-10. **Frame Stacking**: `VecFrameStack` with 4 frames, channels-last format
+8. **Observation Normalization**: `NormalizeObservation` (divide by 255 for [0,1] range)
+9. **API Compatibility**: `GymV21CompatibilityV0` (Shimmy wrapper)
+10. **Vectorization**: `SubprocVecEnv` for true multiprocessing (faster than DummyVecEnv)
+11. **Frame Stacking**: `VecFrameStack` with 4 frames, channels-last format
 
 ### PPO Hyperparameters
 
-Optimized hyperparameters for fast training (train.py:246-264):
+Optimized hyperparameters for Mario (train.py:247-265):
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `learning_rate` | linear_schedule(2.5e-4) | Linear decay from 2.5e-4 to 0 |
-| `n_steps` | 128 | Steps per environment per update |
-| `batch_size` | 256 | Samples per gradient update |
-| `n_epochs` | 4 | PPO update epochs per batch |
-| `gamma` | 0.99 | Discount factor |
-| `gae_lambda` | 0.95 | GAE parameter |
-| `clip_range` | linear_schedule(0.1) | Linear decay from 0.1 to 0 |
+| `learning_rate` | 1e-4 | Fixed learning rate |
+| `n_steps` | 512 | Steps per environment per update |
+| `batch_size` | 16 | Samples per gradient update |
+| `n_epochs` | 10 | PPO update epochs per batch |
+| `gamma` | 0.9 | Discount factor (lower = values immediate rewards more) |
+| `gae_lambda` | 1.0 | GAE parameter |
+| `clip_range` | 0.2 | Fixed PPO clip range |
 | `clip_range_vf` | None | VF clipping disabled |
 | `ent_coef` | 0.01 | Entropy coefficient |
 | `vf_coef` | 0.5 | Value function coefficient |
@@ -300,12 +347,12 @@ Max distance reached: 3161
 - **Reason**: MPS support in Stable Baselines3 is incomplete, and PPO is optimized for CPU
 
 #### Low Performance After Training
-- **Solution**: Increase training timesteps to 20M+
-- **Learning Rate**: The linear schedule already decays from 2.5e-4 to 0
+- **Solution**: Increase training timesteps to 10M+
+- **Learning Rate**: Fixed at 1e-4 for stable training
 
 #### Training Instability
-- **Solution**: The current settings use conservative clip_range (0.1 with linear decay)
-- **Batch Size**: Current 256 provides stable gradient estimates
+- **Solution**: The current settings use clip_range=0.2 and gamma=0.9
+- **Batch Size**: Small batch size (16) with more epochs (10) per update
 
 #### Agent Not Progressing
 - **Solution**: Check reward signal in TensorBoard
@@ -332,29 +379,24 @@ env = create_vec_env(
     seed=42
 )
 
-# Define linear schedule for learning rate
-def linear_schedule(initial_value):
-    def func(progress_remaining):
-        return progress_remaining * initial_value
-    return func
-
 # Policy kwargs with custom CNN
 policy_kwargs = dict(
     features_extractor_class=MarioCNN,
     features_extractor_kwargs=dict(features_dim=512),
+    normalize_images=False,  # Already normalized in wrapper
 )
 
 # Create PPO agent
 agent = PPO(
     'CnnPolicy',
     env,
-    learning_rate=linear_schedule(2.5e-4),
-    n_steps=128,
-    batch_size=256,
-    n_epochs=4,
-    gamma=0.99,
-    gae_lambda=0.95,
-    clip_range=linear_schedule(0.1),
+    learning_rate=1e-4,
+    n_steps=512,
+    batch_size=16,
+    n_epochs=10,
+    gamma=0.9,
+    gae_lambda=1.0,
+    clip_range=0.2,
     ent_coef=0.01,
     policy_kwargs=policy_kwargs,
     tensorboard_log='./logs',
@@ -383,6 +425,7 @@ env = create_vec_env(num_envs=1, env_id='SuperMarioBros-v0')
 policy_kwargs = dict(
     features_extractor_class=MarioCNN,
     features_extractor_kwargs=dict(features_dim=512),
+    normalize_images=False,  # Already normalized in wrapper
 )
 
 # Load model
@@ -484,18 +527,20 @@ runs/<exp_name>/
 
 ### Reward Function
 
-The environment uses the default gym-super-mario-bros reward:
+Custom reward shaping for improved learning:
 
 ```
-r = v + c + d
+r = (base_reward + score_bonus + completion_bonus) / 10
 
 where:
-  v = x_new - x_old  (velocity/progress to the right)
-  c = clock_old - clock_new  (time penalty)
-  d = -15 if died, else 0  (death penalty)
+  base_reward = x_new - x_old + time_penalty  (default env reward)
+  score_bonus = (current_score - previous_score) / 40  (game score bonus)
+  completion_bonus = +50 if flag_get, -50 if died
 
-Reward is clipped to [-15, 15]
+Final reward is scaled by 0.1 for stable training
 ```
+
+**Note**: Due to the /10 scaling, reported rewards are ~10x smaller than with default rewards. A reward of ~300 indicates strong performance.
 
 ### Frame Stacking
 

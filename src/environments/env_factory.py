@@ -1,6 +1,5 @@
 """
 Environment factory for creating Super Mario Bros environments
-Following Kaggle notebook implementation
 """
 
 import warnings
@@ -20,7 +19,7 @@ import cv2
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
-from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecFrameStack, VecNormalize
 from shimmy.openai_gym_compatibility import GymV21CompatibilityV0
 from gym.wrappers.gray_scale_observation import GrayScaleObservation
 
@@ -53,7 +52,7 @@ class SkipFrame(Wrapper):
 
 
 class ResizeEnv(ObservationWrapper):
-    """Resize environment to 84x84 (Kaggle implementation)"""
+    """Resize environment to 84x84"""
     def __init__(self, env: gym.Env, size: int = 84):
         super().__init__(env)
         old_shape = env.observation_space.shape
@@ -71,30 +70,89 @@ class ResizeEnv(ObservationWrapper):
         return frame
 
 
-class NormalizeRewardEnv(Wrapper):
-    """Normalize rewards from the environment.
+class CustomReward(Wrapper):
+    """Custom reward shaping for Super Mario Bros.
 
-    The default gym-super-mario-bros reward function is already well-designed:
-    - x_reward: Horizontal progress (positive for moving right)
-    - time_penalty: Small penalty for each frame (encourages speed)
-    - death_penalty: -25 for dying
-
-    Reward range is clipped to (-15, 15) by the environment.
-
-    This wrapper optionally scales rewards for more stable training.
-    Reference: https://github.com/Kautenja/gym-super-mario-bros
+    Improvements over default rewards:
+    - Adds score-based reward bonus (game score divided by 40)
+    - +50 bonus for reaching the flag
+    - -50 penalty for dying
+    - All rewards scaled by 0.1 for more stable training
     """
-    def __init__(self, env: gym.Env, scale: float = 1.0):
+    def __init__(self, env: gym.Env, world: int = 1, stage: int = 1):
         super().__init__(env)
-        self.scale = scale
+        self.curr_score = 0
+        self.current_x = 40
+        self.world = world
+        self.stage = stage
 
     def step(self, action: int) -> StepReturn:  # type: ignore[override]
         result = self.env.step(action)
         obs: np.ndarray = result[0]
-        reward: float = float(result[1]) * self.scale
+        reward: float = float(result[1])
         done: bool = result[2]  # type: ignore[assignment]
         info: Dict[str, Any] = result[-1]  # type: ignore[assignment]
-        return obs, reward, done, info
+
+        # Add score-based reward
+        if 'score' in info:
+            reward += (info['score'] - self.curr_score) / 40.0
+            self.curr_score = info['score']
+
+        # Flag/death bonuses
+        if done:
+            if info.get('flag_get', False):
+                reward += 50
+            else:
+                reward -= 50
+
+        # Special handling for maze levels (7-4 and 4-4) to penalize wrong paths
+        if self.world == 7 and self.stage == 4:
+            x_pos = info.get('x_pos', 0)
+            y_pos = info.get('y_pos', 0)
+            if ((506 <= x_pos <= 832 and y_pos > 127) or
+                (832 < x_pos <= 1064 and y_pos < 80) or
+                (1113 < x_pos <= 1464 and y_pos < 191) or
+                (1579 < x_pos <= 1943 and y_pos < 191) or
+                (1946 < x_pos <= 1964 and y_pos >= 191) or
+                (1984 < x_pos <= 2060 and (y_pos >= 191 or y_pos < 127)) or
+                (2114 < x_pos < 2440 and y_pos < 191) or
+                x_pos < self.current_x - 500):
+                reward -= 50
+                done = True
+
+        if self.world == 4 and self.stage == 4:
+            x_pos = info.get('x_pos', 0)
+            y_pos = info.get('y_pos', 0)
+            if ((x_pos <= 1500 and y_pos < 127) or
+                (1588 <= x_pos < 2380 and y_pos >= 127)):
+                reward = -50
+                done = True
+
+        self.current_x = info.get('x_pos', self.current_x)
+
+        # Scale all rewards by 0.1 for stability
+        return obs, reward / 10.0, done, info
+
+    def reset(self, **kwargs):
+        self.curr_score = 0
+        self.current_x = 40
+        return self.env.reset(**kwargs)
+
+
+class NormalizeObservation(ObservationWrapper):
+    """Normalize observations to [0, 1] range by dividing by 255."""
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        old_space = env.observation_space
+        self.observation_space = spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=old_space.shape,
+            dtype=np.float32
+        )
+
+    def observation(self, observation: np.ndarray) -> np.ndarray:
+        return observation.astype(np.float32) / 255.0
 
 
 class TimeLimitWrapper(Wrapper):
@@ -123,44 +181,42 @@ class TimeLimitWrapper(Wrapper):
         return self.env.reset(**kwargs)
 
 
+def parse_world_stage(env_id: str) -> Tuple[int, int]:
+    """Parse world and stage from environment ID.
+
+    Examples:
+        'SuperMarioBros-v0' -> (1, 1)
+        'SuperMarioBros-1-2-v0' -> (1, 2)
+        'SuperMarioBros-7-4-v0' -> (7, 4)
+    """
+    import re
+    match = re.match(r'SuperMarioBros-(\d+)-(\d+)-v\d+', env_id)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return 1, 1  # Default to World 1-1
+
+
 def create_mario_env(
     env_id='SuperMarioBros-v0',
     seed=None,
     return_base_env=False,
-    reward_scale=1.0,
-    max_steps=2000
+    max_steps=2000,
+    use_custom_reward=True
 ):
-    """Create a Super Mario Bros environment with standard preprocessing.
-
-    Uses the default gym-super-mario-bros reward function which is well-designed:
-    - x_reward: Horizontal movement progress (positive for right, negative for left)
-    - time_penalty: Small penalty per frame to encourage speed
-    - death_penalty: -25 for dying
-
-    Preprocessing pipeline:
-    1. JoypadSpace with SIMPLE_MOVEMENT (7 discrete actions)
-    2. NormalizeRewardEnv (optional reward scaling)
-    3. SkipFrame (skip=4 for temporal abstraction)
-    4. TimeLimitWrapper (max_steps to prevent getting stuck)
-    5. GrayScaleObservation (keep_dim=True)
-    6. ResizeEnv (84x84)
-    7. GymV21CompatibilityV0 (for Stable Baselines3 compatibility)
-
-    Args:
-        env_id: Environment ID (default: 'SuperMarioBros-v0')
-        seed: Random seed for reproducibility
-        return_base_env: If True, return both wrapped and base NES environment
-        reward_scale: Scale factor for rewards (default: 1.0, no scaling)
-        max_steps: Maximum steps per episode before reset (default: 2000)
-    """
+    """Create a Super Mario Bros environment with preprocessing wrappers."""
+    world, stage = parse_world_stage(env_id)
 
     nes_env = gym_super_mario_bros.make(env_id)
     env = JoypadSpace(nes_env, SIMPLE_MOVEMENT)
-    env = NormalizeRewardEnv(env, scale=reward_scale)
+
+    if use_custom_reward:
+        env = CustomReward(env, world=world, stage=stage)
+
     env = SkipFrame(env, skip=4)
     env = TimeLimitWrapper(env, max_steps=max_steps)
     env = GrayScaleObservation(env, keep_dim=True)
     env = ResizeEnv(env, size=84)
+    env = NormalizeObservation(env)
     env = GymV21CompatibilityV0(env=env)
 
     if seed is not None:
@@ -176,17 +232,10 @@ def create_vec_env(
     env_id='SuperMarioBros-v0',
     frame_stack=4,
     seed=None,
-    reward_scale=1.0
+    use_subproc=True,
+    use_custom_reward=True
 ):
-    """Create vectorized Super Mario Bros environments for parallel training.
-
-    Args:
-        num_envs: Number of parallel environments
-        env_id: Environment ID
-        frame_stack: Number of frames to stack (default: 4)
-        seed: Random seed for reproducibility
-        reward_scale: Scale factor for rewards (default: 1.0)
-    """
+    """Create vectorized Super Mario Bros environments for parallel training."""
 
     def make_env(rank):
         def _init():
@@ -194,11 +243,14 @@ def create_vec_env(
             return create_mario_env(
                 env_id=env_id,
                 seed=env_seed,
-                reward_scale=reward_scale
+                use_custom_reward=use_custom_reward
             )
         return _init
-
-    vec_env = DummyVecEnv([make_env(i) for i in range(num_envs)])  # type: ignore
+    
+    if use_subproc and num_envs > 1:
+        vec_env = SubprocVecEnv([make_env(i) for i in range(num_envs)])  # type: ignore
+    else:
+        vec_env = DummyVecEnv([make_env(i) for i in range(num_envs)])  # type: ignore
 
     if frame_stack > 1:
         vec_env = VecFrameStack(vec_env, n_stack=frame_stack, channels_order='last')
@@ -210,21 +262,15 @@ def create_eval_env(
     env_id='SuperMarioBros-v0',
     frame_stack=4,
     seed=None,
-    reward_scale=1.0
+    use_custom_reward=True
 ):
-    """Create an evaluation environment.
-
-    Args:
-        env_id: Environment ID
-        frame_stack: Number of frames to stack (default: 4)
-        seed: Random seed for reproducibility
-        reward_scale: Scale factor for rewards (default: 1.0)
-    """
+    """Create an evaluation environment."""
 
     return create_vec_env(
         num_envs=1,
         env_id=env_id,
         frame_stack=frame_stack,
         seed=seed,
-        reward_scale=reward_scale
+        use_subproc=False,  # Use DummyVecEnv for single eval env
+        use_custom_reward=use_custom_reward
     )

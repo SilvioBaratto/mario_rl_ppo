@@ -180,9 +180,10 @@ def main():
     logger.info(f"Parallel environments: {args.num_envs}")
     logger.info(f"Frame stack: {args.frame_stack}")
     logger.info("Action space: SIMPLE_MOVEMENT (7 actions)")
-    logger.info("Hyperparameters (Optimized for fast training):")
-    logger.info("  learning_rate=lin_2.5e-4, n_steps=128, batch_size=256")
-    logger.info("  n_epochs=4, gamma=0.99, gae_lambda=0.95, ent_coef=0.01")
+    logger.info("Hyperparameters:")
+    logger.info("  learning_rate=1e-4, n_steps=512, batch_size=16")
+    logger.info("  n_epochs=10, gamma=0.9, gae_lambda=1.0, ent_coef=0.01")
+    logger.info("Custom reward shaping: score bonus, +50 flag, -50 death, /10 scale")
 
     # Setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
@@ -217,6 +218,7 @@ def main():
     policy_kwargs = dict(
         features_extractor_class=MarioCNN,
         features_extractor_kwargs=dict(features_dim=512),
+        normalize_images=False,  # Already normalized to [0,1] in NormalizeObservation wrapper
     )
 
     if args.resume:
@@ -226,8 +228,8 @@ def main():
             raise FileNotFoundError(f"Checkpoint not found: {args.resume}")
 
         custom_objects = {
-            'learning_rate': linear_schedule(2.5e-4),
-            'clip_range': linear_schedule(0.1),
+            'learning_rate': 1e-4,  # Fixed learning rate
+            'clip_range': 0.2,      # Fixed clip range
             'policy_kwargs': policy_kwargs
         }
 
@@ -240,23 +242,23 @@ def main():
         )
         logger.info("Model loaded successfully, resuming training...")
     else:
-        # Create new PPO agent with optimized hyperparameters
+        # Create new PPO agent with hyperparameters
         logger.info("Creating PPO agent with custom MarioCNN...")
 
         agent = PPO(
             'CnnPolicy',
             env,
-            learning_rate=linear_schedule(2.5e-4),
-            n_steps=128,
-            batch_size=256,
-            n_epochs=4,
-            gamma=0.99,
-            gae_lambda=0.95,
-            clip_range=linear_schedule(0.1),
+            learning_rate=1e-4,      # Fixed LR (was linear_schedule(2.5e-4))
+            n_steps=512,             # Steps per env per update (was 128)
+            batch_size=16,           # Mini-batch size (was 256)
+            n_epochs=10,             # PPO epochs per update (was 4)
+            gamma=0.9,               # Discount factor (was 0.99)
+            gae_lambda=1.0,          # GAE lambda (was 0.95)
+            clip_range=0.2,          # Fixed clip range (was linear_schedule(0.1))
             clip_range_vf=None,
-            ent_coef=0.01,
-            vf_coef=0.5,
-            max_grad_norm=0.5,
+            ent_coef=0.01,           # Entropy coefficient
+            vf_coef=0.5,             # Value function coefficient
+            max_grad_norm=0.5,       # Gradient clipping
             verbose=1,
             policy_kwargs=policy_kwargs,
             tensorboard_log=str(dirs['logs']),
