@@ -30,7 +30,7 @@ A production-ready implementation of Proximal Policy Optimization (PPO) for trai
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mario-rl-ppo.git
+git clone https://github.com/SilvioBaratto/mario-rl-ppo.git
 cd mario-rl-ppo
 
 # Create virtual environment (recommended)
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mario-rl-ppo.git
+git clone https://github.com/SilvioBaratto/mario-rl-ppo.git
 cd mario-rl-ppo
 
 # Build the Docker image
