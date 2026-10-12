@@ -8,7 +8,7 @@ A production-ready implementation of Proximal Policy Optimization (PPO) for trai
 - **PPO Algorithm**: Stable and sample-efficient policy gradient method from Stable Baselines3
 - **Custom CNN Architecture**: Purpose-built feature extractor optimized for frame-based observations
 - **Vectorized Training**: Parallel environment execution for improved sample efficiency
-- **Advanced Preprocessing**: Grayscale conversion, frame stacking, and proper gym/gymnasium compatibility
+- **Advanced Preprocessing**: Grayscale conversion, frame stacking, native Gymnasium API
 
 ### Production Features
 - **Modular Architecture**: Clean separation of agents, environments, and utilities
@@ -21,7 +21,7 @@ A production-ready implementation of Proximal Policy Optimization (PPO) for trai
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.13+ (required by gym-super-mario-bros 9.x / nes-py 9.x)
 - pip
 - (Optional) Docker and Docker Compose
 - (Optional) CUDA-compatible GPU for faster training
@@ -72,28 +72,63 @@ docker-compose run --rm train python train.py --total-timesteps 100000 --num-env
 python train.py --total-timesteps 10000000 --num-envs 8 --exp-name my_experiment
 ```
 
-#### Training with Video Recording
+#### Multi-Level Training
 ```bash
-# Record evaluation videos every 5 evaluations
-python train.py \
-  --total-timesteps 10000000 \
-  --num-envs 8 \
-  --record-video \
-  --video-freq 5 \
-  --exp-name mario_with_videos
+# One policy trained on 1-1, 1-2 and 1-3 together; workers are split round-robin
+# across the levels, so use a multiple of the level count for --num-envs
+python train.py --levels 1-1,1-2,1-3 --num-envs 9 --total-timesteps 3000000 --exp-name world1_multi
+
+# Per-level report, including an unseen level to measure generalization
+python evaluate.py --model-path runs/world1_multi/checkpoints/best_model --levels 1-1,1-2,1-3,1-4
+```
+Each evaluation during training runs `--eval-episodes` episodes on every level, and
+`best_model` tracks the mean reward across them. Repeating a level weights it: with
+`--levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9`, 1-3 gets 5 of 9 workers and 3x the
+evaluation episodes, which suits fine-tuning a multi-level model on its weakest level
+(`--resume <checkpoint>` keeps the step count, so set `--total-timesteps` to the new total). For reference, a single-level 1-1
+model (1M steps) clears 1-1 every time but reaches only x≈190 on 1-2, x≈420 on 1-3
+and x≈230 on 1-4.
+
+#### Frontier Starts (practising hard obstacles)
+```bash
+# Half of the training resets restart from a saved emulator state 50-400 px behind the
+# point where recent episodes on that level usually end
+python train.py --levels 1-1,1-2,1-3 --num-envs 9 --frontier-starts 0.5 --exp-name world1_frontier
+```
+Episodes otherwise always restart at the level start, so an obstacle deep in a level (the
+tall tree-top jump at x≈783 in 1-3) is attempted once per long run-up the agent has already
+mastered. `FrontierStart` snapshots the emulator whenever Mario stands on solid ground and
+tracks each level's frontier (median furthest x of the last 20 episodes), so the restart
+point moves forward as the agent improves. Evaluation, `evaluate.py` and
+`play_and_record.py` always start at the real level start. With frontier starts enabled,
+`rollout/ep_rew_mean` mixes full and partial episodes, so judge progress by evaluation.
+
+#### Demonstration Starts (obstacles exploration can't find)
+Some obstacles need an action sequence the policy essentially never samples. In 1-3 the
+gap at x≈783 is only crossable with a *short* hop (A held 4-12 frames) onto an
+intermediate tree-top followed by a full jump; the agent always does a long jump onto a
+dead-end platform. `src/environments/demo_routes/1-3.json` records one successful route
+(frame-level joypad bytes from a fresh reset, with waypoint x positions that a replay must
+reproduce). With `--demo-starts`, each worker replays its level's route once and adds the
+waypoints to the frontier restart points while they lie ahead of the agent's frontier;
+demo-started episodes are excluded from the frontier statistics.
+```bash
+python train.py --resume runs/world1_frontier/checkpoints/best_model \
+  --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 3100000 \
+  --frontier-starts 0.5 --demo-starts --exp-name world1_demo
 ```
 
-#### Training with Config File
-```bash
-# Use a YAML configuration file
-python train.py --config runs/ppo_with_videos/config.yaml
-```
+#### Expected Learning Curve (World 1-1)
+Measured with the defaults on an Apple M4 (8 envs, MPS, single seed): the
+deterministic policy first clears 1-1 at 800k steps (10/10 evaluation episodes,
+~40 min of training). `--n-epochs 4` runs ~1.4x more steps/s but did not reach
+the flag once within 1M steps, so keep the default 10 epochs.
 
 #### Resume Training
 ```bash
-# Resume from a checkpoint
+# Continue a run until it reaches 20M total timesteps (the step counter carries over)
 python train.py \
-  --resume runs/my_experiment/checkpoints/checkpoint_1000000 \
+  --resume runs/my_experiment/checkpoints/checkpoint_10000000 \
   --total-timesteps 20000000 \
   --exp-name my_experiment_continued
 ```
@@ -158,13 +193,14 @@ python play_and_record.py \
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--model-path` | (required) | Path to trained model (.zip file) |
+| `--model-path` | (required) | Path to trained model (.zip optional) |
 | `--output` | auto | Output video path (auto-generates timestamp-based name) |
-| `--env-id` | SuperMarioBros-v0 | Environment ID |
+| `--env-id` | SuperMarioBros-1-1-v0 | Environment ID |
 | `--frame-stack` | 4 | Number of frames to stack |
-| `--max-steps` | 5000 | Maximum steps per episode |
+| `--max-steps` | 5000 | Maximum agent steps (also the episode time limit) |
+| `--noop-max` | 30 | Max random NOOP frames before the episode starts |
 | `--seed` | 42 | Random seed |
-| `--deterministic` | True | Use deterministic policy |
+| `--stochastic` | False | Sample actions instead of the deterministic policy |
 | `--device` | auto | Device to use (cpu/cuda/mps/auto) |
 
 The script outputs:
@@ -182,8 +218,7 @@ mario-rl-ppo/
 │   │   └── ppo_agent.py          # PPO implementation with custom CNN
 │   ├── environments/
 │   │   ├── __init__.py
-│   │   ├── env_factory.py        # Environment creation utilities
-│   │   └── wrappers.py           # Custom environment wrappers
+│   │   └── env_factory.py        # Environment wrappers and VecEnv factories
 │   └── utils/
 │       ├── __init__.py
 │       └── logger.py             # Logging utilities
@@ -206,7 +241,7 @@ mario-rl-ppo/
 
 ### Custom CNN Feature Extractor
 
-The `MarioCNN` class (src/agents/ppo_agent.py:14-73) implements a custom convolutional neural network optimized for Super Mario Bros:
+The `MarioCNN` class (src/agents/ppo_agent.py) implements a custom convolutional neural network optimized for Super Mario Bros:
 
 **Architecture**:
 - **Conv Layer 1**: 32 filters, 3x3 kernel, stride 2, padding 1
@@ -219,32 +254,32 @@ The `MarioCNN` class (src/agents/ppo_agent.py:14-73) implements a custom convolu
 - Orthogonal weight initialization for stable training
 - Automatic channels-first/last format detection
 - Handles both (H, W, C) and (C, H, W) input formats
-- Designed for 4-frame stacked grayscale observations (normalized to [0,1])
+- Designed for 4-frame stacked grayscale observations (uint8 frames, scaled to [0,1] by SB3 on the training device)
 
 ### Environment Preprocessing Pipeline
 
-1. **Base Environment**: `gym-super-mario-bros` (Gym v0.21 API)
+1. **Base Environment**: `gym-super-mario-bros` 9.x (Gymnasium API); default `SuperMarioBros-1-1-v0`, where an episode ends on death or flag
 2. **Action Mapping**: `JoypadSpace` with SIMPLE_MOVEMENT (7 discrete actions)
-3. **Custom Reward Shaping**: `CustomReward` (score bonus, flag/death penalties, /10 scaling)
-4. **Frame Skipping**: `SkipFrame` (skip=4 for temporal abstraction)
-5. **Time Limit**: `TimeLimitWrapper` (max 2000 steps to prevent getting stuck)
-6. **Grayscale Conversion**: `GrayScaleObservation` (keep_dim=True)
-7. **Resize**: `ResizeEnv` (84x84)
-8. **Observation Normalization**: `NormalizeObservation` (divide by 255 for [0,1] range)
-9. **API Compatibility**: `GymV21CompatibilityV0` (Shimmy wrapper)
-10. **Vectorization**: `SubprocVecEnv` for true multiprocessing (faster than DummyVecEnv)
-11. **Frame Stacking**: `VecFrameStack` with 4 frames, channels-last format
+3. **Random Starts**: `NoopReset` (0-30 NOOP frames after each reset, so episodes from the deterministic emulator differ)
+4. **Custom Reward Shaping**: `CustomReward` (score bonus, +50 flag, -50 per life lost, /10 scaling)
+5. **Frame Skipping**: `SkipFrame` (skip=4 for temporal abstraction)
+6. **Stall Cutoff**: `StallTruncation` (truncate after 150 agent steps without a new furthest x; stuck greedy episodes otherwise run 2000 steps)
+7. **Time Limit**: Gymnasium `TimeLimit` (max 2000 steps)
+8. **Grayscale + Resize**: `GrayResizeObservation` (cv2, 84x84 uint8)
+9. **Vectorization**: `SubprocVecEnv` for true multiprocessing (faster than DummyVecEnv)
+10. **Episode Statistics**: `VecMonitor` (feeds `rollout/ep_rew_mean` / `ep_len_mean` in TensorBoard)
+11. **Frame Stacking**: `VecFrameStack` with 4 frames; SB3 adds `VecTransposeImage` so the CNN gets channels-first input
 
 ### PPO Hyperparameters
 
-Optimized hyperparameters for Mario (train.py:247-265):
+Optimized hyperparameters for Mario (train.py):
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | `learning_rate` | 1e-4 | Fixed learning rate |
 | `n_steps` | 512 | Steps per environment per update |
-| `batch_size` | 16 | Samples per gradient update |
-| `n_epochs` | 10 | PPO update epochs per batch |
+| `batch_size` | 256 | Samples per gradient update (`--batch-size`) |
+| `n_epochs` | 10 | PPO update epochs per rollout (`--n-epochs`) |
 | `gamma` | 0.9 | Discount factor (lower = values immediate rewards more) |
 | `gae_lambda` | 1.0 | GAE parameter |
 | `clip_range` | 0.2 | Fixed PPO clip range |
@@ -259,23 +294,34 @@ Optimized hyperparameters for Mario (train.py:247-265):
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--env-id` | SuperMarioBros-v0 | Environment ID |
+| `--env-id` | SuperMarioBros-1-1-v0 | Environment ID |
+| `--levels` | None | Train on several levels together, e.g. `1-1,1-2,1-3` (overrides `--env-id`); repeating a level gives it more workers |
 | `--num-envs` | 8 | Number of parallel environments |
 | `--frame-stack` | 4 | Number of frames to stack |
-| `--total-timesteps` | 10000000 | Total training timesteps |
+| `--total-timesteps` | 10000000 | Total timesteps to reach (also the target when resuming) |
+| `--batch-size` | 256 | PPO minibatch size in samples |
+| `--n-epochs` | 10 | PPO epochs per rollout |
 | `--eval-freq` | 50000 | Evaluation frequency |
+| `--eval-episodes` | 3 | Episodes per evaluation |
 | `--save-freq` | 100000 | Model save frequency |
+| `--noop-max` | 30 | Max random NOOP frames after each reset (0 disables) |
+| `--stall-steps` | 150 | Truncate an episode after this many steps without a new furthest x (0 disables) |
+| `--frontier-starts` | 0.0 | Fraction of training resets that restart just behind where episodes usually end (0 disables) |
+| `--demo-starts` | False | With `--frontier-starts`, also restart from waypoints of recorded demonstration routes |
 | `--exp-name` | auto | Experiment name |
 | `--seed` | 42 | Random seed |
 | `--device` | auto | Device (cpu/cuda/mps/auto) |
-| `--resume` | None | Path to checkpoint to resume from |
+| `--resume` | None | Path to checkpoint to resume from (.zip optional) |
 
 ### Evaluation (evaluate.py)
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--model-path` | (required) | Path to trained model |
-| `--env-id` | SuperMarioBros-v0 | Environment ID |
+| `--model-path` | (required) | Path to trained model (.zip optional) |
+| `--env-id` | SuperMarioBros-1-1-v0 | Environment ID |
+| `--noop-max` | 30 | Max random NOOP frames after each reset (0 makes deterministic episodes identical) |
+| `--levels` | None | Evaluate on several levels, e.g. `1-1,1-2,1-3,1-4`; prints a per-level summary |
+| `--stall-steps` | 150 | End an episode after this many steps without a new furthest x (0 disables) |
 | `--frame-stack` | 4 | Number of frames to stack |
 | `--n-episodes` | 10 | Number of evaluation episodes |
 | `--render` | False | Render environment live |
@@ -339,12 +385,12 @@ Max distance reached: 3161
 
 ### Troubleshooting
 
-#### Training Slow or Getting Stuck on Apple Silicon (MPS)
-- **Solution**: Use CPU instead of MPS for more stable performance
+#### Choosing a Device on Apple Silicon
+- `--device auto` picks MPS, the fastest option here: on an Apple M4 with 8 envs, ~450 steps/s on MPS vs ~155 steps/s on CPU, because the PPO update is bound by the CNN
+- If MPS misbehaves, fall back to CPU (about 3x slower):
   ```bash
-  python train.py --device cpu --total-timesteps 10000000
+  python train.py --device cpu
   ```
-- **Reason**: MPS support in Stable Baselines3 is incomplete, and PPO is optimized for CPU
 
 #### Low Performance After Training
 - **Solution**: Increase training timesteps to 10M+
@@ -352,15 +398,15 @@ Max distance reached: 3161
 
 #### Training Instability
 - **Solution**: The current settings use clip_range=0.2 and gamma=0.9
-- **Batch Size**: Small batch size (16) with more epochs (10) per update
+- **Batch Size**: 256-sample minibatches (16 per 4096-sample rollout) with 10 epochs per update
 
 #### Agent Not Progressing
-- **Solution**: Check reward signal in TensorBoard
+- **Solution**: Check `rollout/ep_rew_mean` and `eval/mean_reward` in TensorBoard
 - **Evaluation**: Run periodic evaluations to identify issues early
 - **Video Recording**: Enable to visually inspect behavior
 
 #### Environment Getting Stuck
-- **Solution**: The `TimeLimitWrapper` automatically resets episodes after 2000 steps
+- **Solution**: The `TimeLimit` wrapper automatically resets episodes after 2000 steps
 
 ## Advanced Usage
 
@@ -368,22 +414,15 @@ Max distance reached: 3161
 
 ```python
 from src.environments.env_factory import create_vec_env
-from src.agents.ppo_agent import MarioCNN
+from src.agents.ppo_agent import mario_policy_kwargs
 from stable_baselines3 import PPO
 
-# Create environment
+# Create environment (run from the repo root; SubprocVecEnv needs a __main__ guard)
 env = create_vec_env(
     num_envs=8,
-    env_id='SuperMarioBros-v0',
+    env_id='SuperMarioBros-1-1-v0',
     frame_stack=4,
     seed=42
-)
-
-# Policy kwargs with custom CNN
-policy_kwargs = dict(
-    features_extractor_class=MarioCNN,
-    features_extractor_kwargs=dict(features_dim=512),
-    normalize_images=False,  # Already normalized in wrapper
 )
 
 # Create PPO agent
@@ -392,15 +431,15 @@ agent = PPO(
     env,
     learning_rate=1e-4,
     n_steps=512,
-    batch_size=16,
+    batch_size=256,
     n_epochs=10,
     gamma=0.9,
     gae_lambda=1.0,
     clip_range=0.2,
     ent_coef=0.01,
-    policy_kwargs=policy_kwargs,
+    policy_kwargs=mario_policy_kwargs(),
     tensorboard_log='./logs',
-    device='cpu',  # Recommended for stability
+    device='auto',
     verbose=1
 )
 
@@ -415,25 +454,13 @@ agent.save('my_mario_model')
 
 ```python
 from src.environments.env_factory import create_vec_env
-from src.agents.ppo_agent import MarioCNN
-from stable_baselines3 import PPO
+from src.agents.ppo_agent import load_mario_model
 
 # Create environment
-env = create_vec_env(num_envs=1, env_id='SuperMarioBros-v0')
+env = create_vec_env(num_envs=1, env_id='SuperMarioBros-1-1-v0')
 
-# Policy kwargs for loading
-policy_kwargs = dict(
-    features_extractor_class=MarioCNN,
-    features_extractor_kwargs=dict(features_dim=512),
-    normalize_images=False,  # Already normalized in wrapper
-)
-
-# Load model
-agent = PPO.load(
-    'runs/my_exp/checkpoints/best_model',
-    env=env,
-    custom_objects={'policy_kwargs': policy_kwargs}
-)
+# Load model (.zip optional)
+agent = load_mario_model('runs/my_exp/checkpoints/best_model', env=env)
 
 # Run agent
 obs = env.reset()
@@ -535,7 +562,11 @@ r = (base_reward + score_bonus + completion_bonus) / 10
 where:
   base_reward = x_new - x_old + time_penalty  (default env reward)
   score_bonus = (current_score - previous_score) / 40  (game score bonus)
-  completion_bonus = +50 if flag_get, -50 if died
+  completion_bonus = +50 when the flag is reached, -50 for every life lost
+
+Flag and death events are detected from the env's info (flag_get edge, life
+counter), so they fire correctly on single-stage ids and on the multi-level
+SuperMarioBros-v0.
 
 Final reward is scaled by 0.1 for stable training
 ```
@@ -544,7 +575,7 @@ Final reward is scaled by 0.1 for stable training
 
 ### Frame Stacking
 
-- Observations are stacked as (H, W, C) where C=4 (channels-last)
+- Frames are stacked channels-last as (84, 84, 4) uint8; SB3's `VecTransposeImage` hands the CNN channels-first (4, 84, 84)
 - The custom CNN automatically detects and handles the format
 - Provides temporal information for the agent to perceive motion
 
@@ -555,7 +586,7 @@ Automatic device selection in order of preference:
 2. MPS (Apple Silicon)
 3. CPU (fallback)
 
-**Recommendation**: For stable training, use `--device cpu`. MPS support in Stable Baselines3 is incomplete and may cause slowdowns or freezes.
+**Recommendation**: keep `auto`. With uint8 channels-first observations, MPS trains ~3x faster than CPU on Apple Silicon; use `--device cpu` only if MPS misbehaves.
 
 ## Development
 

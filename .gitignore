@@ -84,3 +84,4 @@ docs/_build/
 !package.json
 !configs/*.yaml
 !configs/*.json
+!src/environments/demo_routes/*.json

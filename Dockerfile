@@ -1,7 +1,7 @@
 # Super Mario Bros RL with PPO
 # Multi-stage build for optimized image size
 
-FROM python:3.10-slim as base
+FROM python:3.13-slim as base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Required for OpenCV
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -35,8 +35,12 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies. torch/torchvision come from the CPU-only index
+# first: the PyPI Linux wheels pull the multi-GB CUDA toolkit, and the
+# containers train with --device cpu.
 RUN pip install --upgrade pip && \
+    pip install --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.14.1 torchvision==0.29.1 && \
     pip install -r requirements.txt
 
 # Copy application code

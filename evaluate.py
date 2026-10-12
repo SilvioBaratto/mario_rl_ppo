@@ -19,26 +19,32 @@ else:
 
 import torch
 import numpy as np
-from pathlib import Path
 import json
 from datetime import datetime
 import imageio
 from tqdm import tqdm
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from environments.env_factory import create_vec_env
-from agents.ppo_agent import MarioCNN
-from stable_baselines3 import PPO
+from environments.env_factory import DEFAULT_ENV_ID, create_vec_env, episode_end_reason, parse_levels
+from agents.ppo_agent import load_mario_model
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluate trained Mario PPO agent')
 
     parser.add_argument('--model-path', type=str, required=True,
-                       help='Path to trained model')
-    parser.add_argument('--env-id', type=str, default='SuperMarioBros-v0',
+                       help='Path to trained model (.zip optional)')
+    parser.add_argument('--env-id', type=str, default=DEFAULT_ENV_ID,
                        help='Environment ID')
+    parser.add_argument('--stall-steps', type=int, default=150,
+                       help='End an episode after this many steps without a new furthest x (0 disables)')
+    parser.add_argument('--levels', type=str, default=None,
+                       help='Evaluate on several levels, e.g. 1-1,1-2,1-3,1-4 (overrides --env-id); '
+                            '--n-episodes runs on each level')
+    parser.add_argument('--noop-max', type=int, default=30,
+                       help='Max random NOOP frames after each reset; 0 makes every '
+                            'deterministic episode identical')
     parser.add_argument('--frame-stack', type=int, default=4,
                        help='Frame stack')
     parser.add_argument('--n-episodes', type=int, default=10,
@@ -110,35 +116,10 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
             if 'x_pos' in info:
                 max_x_pos = max(max_x_pos, info['x_pos'])
 
-            if record_video:
-                try:
-                    base_env = env.envs[0]
-                    unwrapped = base_env
-                    while hasattr(unwrapped, 'env'):
-                        unwrapped = unwrapped.env
-
-                    frame = None
-                    if hasattr(unwrapped, 'render'):
-                        try:
-                            frame = unwrapped.render(mode='rgb_array')
-                        except:
-                            pass
-
-                    if frame is None and hasattr(unwrapped, 'screen'):
-                        screen = unwrapped.screen
-                        if screen is not None:
-                            if isinstance(screen, np.ndarray):
-                                frame = screen
-                            else:
-                                import pygame
-                                frame = pygame.surfarray.array3d(screen)
-                                frame = np.transpose(frame, (1, 0, 2))
-
-                    if frame is not None and frame.size > 0:
-                        frames.append(frame.copy())
-                except Exception as e:
-                    if episode_length == 1:
-                        print(f"Warning: Frame capture error: {e}")
+            # On done the VecEnv has already reset, so the screen shows the next
+            # episode's first frame; skip it. screen is a zero-copy view, so copy it.
+            if record_video and not done:
+                frames.append(env.envs[0].unwrapped.screen.copy())
 
             if render:
                 env.render()
@@ -168,7 +149,7 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
         results['min_reward'] = min(results['min_reward'], total_reward)
         results['max_distance'] = max(results['max_distance'], max_x_pos)
 
-        completion_status = "FLAG GET!" if flag_get else f"Died at x={max_x_pos}"
+        completion_status = "FLAG GET!" if flag_get else f"{episode_end_reason(info)} at x={max_x_pos}"
         most_common_action = max(action_counts.items(), key=lambda x: x[1]) if action_counts else (0, 0)
         print(f"Episode {episode + 1}: Reward={total_reward:.2f}, "
               f"Length={episode_length}, {completion_status}, "
@@ -209,8 +190,21 @@ def print_results(results):
         print(f"  Episode {i+1}: Reward={reward:.2f}, Length={length}, {status}")
 
 
-def save_results(results, save_path):
-    """Save evaluation results to JSON"""
+def print_level_summary(results_by_env):
+    """Print one line per level: success rate, mean reward and furthest distance."""
+
+    print("\n" + "=" * 70)
+    print(f"{'LEVEL':28s} {'SUCCESS':>8s} {'AVG REWARD':>12s} {'AVG MAX X':>10s} {'BEST X':>8s}")
+    print("=" * 70)
+    for env_id, results in results_by_env.items():
+        avg_max_x = np.mean([info['max_x_pos'] for info in results['episode_info']])
+        print(f"{env_id:28s} {results['success_rate']:7.1f}% {results['avg_reward']:12.2f} "
+              f"{avg_max_x:10.1f} {results['max_distance']:8d}")
+    print("=" * 70)
+
+
+def save_results(results_by_env, save_path):
+    """Save evaluation results to JSON, keyed by env id under ``levels``."""
 
     def convert_to_native(obj):
         if isinstance(obj, np.integer):
@@ -226,21 +220,22 @@ def save_results(results, save_path):
         else:
             return obj
 
-    json_results = {
-        'timestamp': datetime.now().isoformat(),
-        'episodes': len(results['episode_rewards']),
-        'success_rate': float(results['success_rate']),
-        'avg_reward': float(results['avg_reward']),
-        'std_reward': float(results['std_reward']),
-        'avg_length': float(results['avg_length']),
-        'std_length': float(results['std_length']),
-        'max_reward': float(results['max_reward']),
-        'min_reward': float(results['min_reward']),
-        'max_distance': int(results['max_distance']),
-        'episode_rewards': [float(r) for r in results['episode_rewards']],
-        'episode_lengths': [int(l) for l in results['episode_lengths']],
-        'episode_info': convert_to_native(results['episode_info'])
-    }
+    json_results = {'timestamp': datetime.now().isoformat(), 'levels': {}}
+    for env_id, results in results_by_env.items():
+        json_results['levels'][env_id] = {
+            'episodes': len(results['episode_rewards']),
+            'success_rate': float(results['success_rate']),
+            'avg_reward': float(results['avg_reward']),
+            'std_reward': float(results['std_reward']),
+            'avg_length': float(results['avg_length']),
+            'std_length': float(results['std_length']),
+            'max_reward': float(results['max_reward']),
+            'min_reward': float(results['min_reward']),
+            'max_distance': int(results['max_distance']),
+            'episode_rewards': [float(r) for r in results['episode_rewards']],
+            'episode_lengths': [int(l) for l in results['episode_lengths']],
+            'episode_info': convert_to_native(results['episode_info'])
+        }
 
     with open(save_path, 'w') as f:
         json.dump(json_results, f, indent=2)
@@ -271,52 +266,49 @@ def main():
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    print("Creating environment...")
-    env = create_vec_env(
-        num_envs=1,
-        env_id=args.env_id,
-        frame_stack=args.frame_stack,
-        seed=args.seed
-    )
-
-    print(f"Loading PPO agent from {args.model_path}...")
-
-    # Set up custom policy kwargs
-    policy_kwargs = dict(
-        features_extractor_class=MarioCNN,
-        features_extractor_kwargs=dict(features_dim=512),
-        normalize_images=False,  # Already normalized to [0,1] in wrapper
-    )
-
-    custom_objects = {
-        'learning_rate': 1e-4,
-        'lr_schedule': lambda _: 1e-4,
-        'policy_kwargs': policy_kwargs
-    }
-
-    agent = PPO.load(args.model_path, env=env, device=device, custom_objects=custom_objects)
-
+    env_ids = parse_levels(args.levels) if args.levels else [args.env_id]
     deterministic = args.deterministic and not args.stochastic
-
-    print(f"\nEvaluating agent for {args.n_episodes} episodes...")
     print(f"Policy mode: {'deterministic' if deterministic else 'stochastic'}")
-    results = evaluate_agent(
-        agent=agent,
-        env=env,
-        n_episodes=args.n_episodes,
-        render=args.render,
-        record_video=args.record_video,
-        video_dir=args.video_dir,
-        deterministic=deterministic
-    )
 
-    print_results(results)
+    results_by_env = {}
+    for env_id in env_ids:
+        print(f"\nCreating environment {env_id}...")
+        env = create_vec_env(
+            num_envs=1,
+            env_id=env_id,
+            frame_stack=args.frame_stack,
+            seed=args.seed,
+            render_mode='human' if args.render else None,
+            noop_max=args.noop_max,
+            stall_steps=args.stall_steps
+        )
+
+        print(f"Loading PPO agent from {args.model_path}...")
+        agent = load_mario_model(args.model_path, env=env, device=device)
+        # PPO.load re-seeds the env with the training run's seed; restore --seed.
+        agent.set_random_seed(args.seed)
+
+        print(f"Evaluating agent for {args.n_episodes} episodes on {env_id}...")
+        video_dir = os.path.join(args.video_dir, env_id) if len(env_ids) > 1 else args.video_dir
+        results = evaluate_agent(
+            agent=agent,
+            env=env,
+            n_episodes=args.n_episodes,
+            render=args.render,
+            record_video=args.record_video,
+            video_dir=video_dir,
+            deterministic=deterministic
+        )
+        print_results(results)
+        results_by_env[env_id] = results
+        env.close()
+
+    if len(env_ids) > 1:
+        print_level_summary(results_by_env)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_path = f"eval_results_ppo_{timestamp}.json"
-    save_results(results, results_path)
-
-    env.close()
+    save_results(results_by_env, results_path)
 
 
 if __name__ == "__main__":

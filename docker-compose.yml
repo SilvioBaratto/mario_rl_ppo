@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Training service
   train:
@@ -33,7 +31,7 @@ services:
     command: >
       python train.py
         --resume runs/docker_train/checkpoints/best_model.zip
-        --total-timesteps 5000000
+        --total-timesteps 15000000
         --device cpu
         --exp-name docker_resumed
     profiles:
@@ -75,7 +73,8 @@ services:
 
   # TensorBoard for monitoring
   tensorboard:
-    image: tensorflow/tensorflow:latest
+    build: .
+    image: mario-rl-ppo
     container_name: mario-tensorboard
     ports:
       - "6006:6006"
