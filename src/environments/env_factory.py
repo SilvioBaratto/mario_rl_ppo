@@ -37,6 +37,15 @@ NOOP_ACTION = SIMPLE_MOVEMENT.index(['NOOP'])
 EnvIds = Union[str, Sequence[str]]
 
 DEMO_ROUTES_DIR = Path(__file__).with_name('demo_routes')
+# Two agent steps between reverse-curriculum start states: fine enough that
+# each step back asks for only a couple of new decisions, coarse enough that
+# the curriculum crosses a ~300-frame route in a few dozen moves.
+DEMO_STRIDE = 8
+FRAME_SKIP = 4
+
+# SMB1 RAM "float state": 0 while Mario stands on solid ground. Frontier
+# snapshots are only taken then, so a restart never begins in a doomed fall.
+SMB1_FLOAT_STATE = 0x001D
 
 
 def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
@@ -216,6 +225,158 @@ class NoopReset(Wrapper):
         return obs, info
 
 
+def level_key(world: Any, stage: Any) -> str:
+    """Return the 'W-S' label used to address a level across processes, e.g. '1-3'."""
+    return f'{world}-{stage}'
+
+
+def route_level(route: Dict[str, Any]) -> str:
+    """Return the 'W-S' label of the level a demonstration route was recorded on."""
+    match = re.fullmatch(r'SuperMarioBros-(\d)-(\d)-v\d+', route['env_id'])
+    if not match:
+        raise ValueError(f"Demo route env_id {route['env_id']!r} is not a single-stage id")
+    return level_key(match.group(1), match.group(2))
+
+
+def demo_warmup_frames(frame_stack: int) -> int:
+    """Return how many route frames a demo restart replays before the agent takes over.
+
+    VecFrameStack zero-fills the stack on every reset, and from a zero-padded
+    stack the policy acts as it does at a level start (it usually lets go of
+    A). Mid-jump that is fatal in SMB1: one frame without A locks in falling
+    gravity for the rest of the jump. Replaying the route for the first
+    ``frame_stack - 1`` agent steps hands control over with a full stack of
+    real frames, as in a normal episode.
+
+    Args:
+        frame_stack: Frames per observation stack.
+
+    Returns:
+        Raw NES frames covering ``frame_stack - 1`` agent steps.
+    """
+    return (frame_stack - 1) * FRAME_SKIP
+
+
+def replay_demo_route(nes, route: Dict[str, Any], stride: int = DEMO_STRIDE,
+                      warmup_frames: int = 0) -> Dict[int, Tuple[Any, List[int], int]]:
+    """Replay a demonstration route and collect the states a reverse curriculum can start from.
+
+    Args:
+        nes: The raw gym-super-mario-bros env of the route's level (``env.unwrapped``);
+            it is reset and left at the route's end.
+        route: A route from ``load_demo_route``.
+        stride: Frames between start states.
+        warmup_frames: Route frames replayed after the restore before the
+            agent's first decision (see ``demo_warmup_frames``).
+
+    Returns:
+        {frame: (state, joypad bytes, x at the frame)} for every frame from
+        ``demo_start_frames``, 1-based from the route's reset. Restoring the
+        state and playing the bytes reproduces the frame exactly; the first
+        byte redraws the screen, the remaining ``warmup_frames`` are forced
+        over the agent's actions. Empty, with a warning, when a waypoint's x
+        does not match.
+    """
+    starts = {frame - warmup_frames: frame for frame in demo_start_frames(route, stride, warmup_frames)}
+    expected = {w['frame']: w['x'] for w in route['waypoints']}
+    nes.reset()
+    saved = {}
+    states = {}
+    for frame, byte in enumerate(route['frames'], start=1):
+        if frame in starts:
+            saved[starts[frame]] = (frame, nes.dump_state())
+        nes.step(byte)
+        x_pos = int(nes._x_position)
+        if frame in saved:
+            first, state = saved.pop(frame)
+            states[frame] = (state, route['frames'][first - 1:frame], x_pos)
+        if frame in expected and x_pos != expected[frame]:
+            warnings.warn(f"demo route {route['env_id']} diverged at frame {frame} "
+                          f"(x={x_pos}, expected {expected[frame]}); ignoring it")
+            return {}
+    return states
+
+
+def demo_start_frames(route: Dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0) -> List[int]:
+    """Return the route frames a reverse curriculum can start from, earliest first.
+
+    Args:
+        route: A route from ``load_demo_route``.
+        stride: Frames between start states.
+        warmup_frames: Route frames replayed before the agent takes over; a
+            start frame needs that many frames of route before it.
+
+    Returns:
+        Every ``stride``-th frame (1-based from the route's reset) up to the
+        route's last frame that leaves room for the warm-up.
+    """
+    return [frame for frame in range(stride, len(route['frames']) + 1, stride) if frame > warmup_frames]
+
+
+class ReverseCurriculum:
+    """Move each level's demonstration start point backward as the agent succeeds from it.
+
+    Start-state curriculum from a single demonstration (Salimans & Chen,
+    2018): episodes first start near the end of a recorded route, past the
+    obstacle, and the start moves one state earlier each time the agent
+    reaches the route's end often enough from the current one. Each step back
+    adds only a few frames of the demonstrated behaviour for the agent to
+    discover itself, until it starts at the level start.
+
+    Lives in the main process: workers hold their own (unpicklable) emulator
+    states, report each finished demo episode as ``info['demo_outcome']`` of
+    the following reset, and receive the current start frame through
+    ``FrontierStart.set_demo_cursor``.
+
+    Args:
+        routes: Demonstration routes to run a curriculum on, at most one per level.
+        warmup_frames: The workers' warm-up length (``demo_warmup_frames``);
+            it decides which frames can be start frames.
+        threshold: Fraction of the last ``window`` episodes from the current
+            start that must reach the route's end before stepping back.
+        window: Number of recent outcomes from the current start considered.
+    """
+
+    def __init__(self, routes: Sequence[Dict[str, Any]], warmup_frames: int,
+                 threshold: float = 0.5, window: int = 10):
+        self.window = window
+        self.required = max(1, int(np.ceil(threshold * window)))
+        self._frames = {route_level(route): demo_start_frames(route, warmup_frames=warmup_frames)
+                        for route in routes}
+        self._index = {level: len(frames) - 1 for level, frames in self._frames.items()}
+        self._outcomes = {level: deque(maxlen=window) for level in self._frames}
+
+    def cursors(self) -> Dict[str, Optional[int]]:
+        """Return each level's current start frame, or None once its curriculum is done."""
+        return {level: self._frames[level][index] if index >= 0 else None
+                for level, index in self._index.items()}
+
+    def record(self, outcome: Dict[str, Any]) -> Optional[Tuple[int, int]]:
+        """Count a finished demo episode and step the start back if it has been mastered.
+
+        Episodes that started from a later (rehearsal) state, or from a start
+        the cursor has already left, are ignored.
+
+        Args:
+            outcome: A worker's ``demo_outcome`` dict with 'level', 'frame' and 'success'.
+
+        Returns:
+            (successes, episodes) counted at the old start when the level's
+            start frame moved back, otherwise None.
+        """
+        level = outcome['level']
+        if level not in self._index or outcome['frame'] != self.cursors()[level]:
+            return None
+        outcomes = self._outcomes[level]
+        outcomes.append(bool(outcome['success']))
+        if sum(outcomes) < self.required:
+            return None
+        counts = (sum(outcomes), len(outcomes))
+        self._index[level] -= 1
+        outcomes.clear()
+        return counts
+
+
 class FrontierStart(Wrapper):
     """Restart a fraction of episodes from saved emulator states just behind the frontier.
 
@@ -228,27 +389,32 @@ class FrontierStart(Wrapper):
     restored. The frontier moves forward by itself as the policy improves.
     Meant for training only: evaluation must start at the real level start.
 
-    Optional demonstration routes add hand-verified states beyond an obstacle
-    the policy cannot explore past on its own (start-state curriculum from a
-    single demonstration). Each route is replayed once in-process (native
-    snapshots cannot be pickled across workers) and its waypoints are offered
-    for half of the restarts while they lie ahead of the frontier; once the
-    agent's own episodes reach them they are no longer used. Episodes started
-    from a demonstration state are left out of the frontier statistics.
+    A level with a demonstration route instead runs a reverse curriculum on
+    those restarts while ``ReverseCurriculum`` (main process) keeps a start
+    frame set through ``set_demo_cursor``: the restart begins at that frame of
+    the route, or with probability ``1 - demo_exact`` at a later one to keep
+    the already-learned part rehearsed. The restore lands ``warmup_frames``
+    before the start frame and forces the route's bytes until it, so the
+    agent's first decision there sees a full frame stack. Route states are
+    captured every ``DEMO_STRIDE`` frames, mid-jump included, by replaying the
+    route once in-process (native snapshots cannot be pickled across workers). The next
+    reset's info reports how a demo episode went as ``demo_outcome``; demo
+    episodes are left out of the frontier statistics.
     """
-    # SMB1 RAM: player "float state", 0 while standing on solid ground. Only
-    # grounded states are saved so a restart never begins in a doomed fall.
-    _FLOAT_STATE_ADDR = 0x001D
+    _NOOP_BYTE = 0
 
     def __init__(self, env: gym.Env, prob: float = 0.5, back_min: int = 50, back_max: int = 400,
                  bucket: int = 32, window: int = 20, min_episodes: int = 5,
-                 demo_routes: Optional[Sequence[Dict[str, Any]]] = None):
+                 demo_routes: Optional[Sequence[Dict[str, Any]]] = None, demo_exact: float = 0.75,
+                 warmup_frames: int = 0):
         super().__init__(env)
         self.prob = prob
         self.back_min = back_min
         self.back_max = back_max
         self.bucket = bucket
         self.min_episodes = min_episodes
+        self.demo_exact = demo_exact
+        self.warmup_frames = warmup_frames
         self._window = window
         self._snapshots: Dict[Tuple[Any, Any], Dict[int, Any]] = {}
         self._episode_ends: Dict[Tuple[Any, Any], deque] = {}
@@ -256,34 +422,27 @@ class FrontierStart(Wrapper):
         self._level = None
         self._episode_max_x = 0
         self._episode_steps = 0
-        self._episode_from_demo = False
-        self._demo_routes: Dict[Tuple[int, int], Dict[str, Any]] = {}
-        for route in demo_routes or []:
-            match = re.fullmatch(r'SuperMarioBros-(\d)-(\d)-v\d+', route['env_id'])
-            self._demo_routes[(int(match.group(1)), int(match.group(2)))] = route
-        self._demo_states: Dict[Tuple[Any, Any], List[Tuple[int, Any]]] = {}
+        self._demo_routes = {route_level(route): route for route in demo_routes or []}
+        self._demo_states: Dict[str, Dict[int, Tuple[Any, List[int], int]]] = {}
+        self._demo_cursor: Dict[str, Optional[int]] = {}
+        self._episode_demo: Optional[Dict[str, Any]] = None
+        self._forced: deque = deque()
 
-    def _demo_states_for(self, level) -> List[Tuple[int, Any]]:
+    def set_demo_cursor(self, level: str, frame: Optional[int]) -> None:
+        """Set the route frame that demo restarts on ``level`` begin from.
+
+        Args:
+            level: 'W-S' label; calls for levels this worker doesn't play are kept but unused.
+            frame: A frame from ``demo_start_frames``, or None to stop demo restarts.
+        """
+        self._demo_cursor[level] = frame
+
+    def _demo_states_for(self, level: str) -> Dict[int, Tuple[Any, List[int], int]]:
         if level not in self._demo_states:
             route = self._demo_routes.get(level)
-            self._demo_states[level] = self._replay(route) if route else []
+            self._demo_states[level] = (replay_demo_route(self.env.unwrapped, route, warmup_frames=self.warmup_frames)
+                                        if route else {})
         return self._demo_states[level]
-
-    def _replay(self, route) -> List[Tuple[int, Any]]:
-        nes = self.env.unwrapped
-        nes.reset()
-        expected = {w['frame']: w['x'] for w in route['waypoints']}
-        states = []
-        for frame, byte in enumerate(route['frames'], start=1):
-            nes.step(byte)
-            if frame in expected:
-                x_pos = int(nes._x_position)
-                if x_pos != expected[frame]:
-                    warnings.warn(f"demo route {route['env_id']} diverged at frame {frame} "
-                                  f"(x={x_pos}, expected {expected[frame]}); ignoring it")
-                    return []
-                states.append((x_pos, nes.dump_state()))
-        return states
 
     def frontier(self, level) -> Optional[float]:
         """Return the median furthest x of recent episodes on ``level``, or None while warming up."""
@@ -292,26 +451,72 @@ class FrontierStart(Wrapper):
             return None
         return float(np.median(ends))
 
+    def _pick_demo_frame(self, level: str) -> Optional[int]:
+        cursor = self._demo_cursor.get(level)
+        if cursor is None:
+            return None
+        states = self._demo_states_for(level)
+        if cursor not in states:
+            return None
+        later = [frame for frame in states if frame > cursor]
+        if not later or self._rng.random() < self.demo_exact:
+            return cursor
+        return later[int(self._rng.integers(len(later)))]
+
+    def _pick_start(self, level: str, level_tuple):
+        """Return (state, joypad bytes to replay, demo frame or None), or None to start normally."""
+        demo_frame = self._pick_demo_frame(level)
+        if demo_frame is not None:
+            state, joypad, _ = self._demo_states[level][demo_frame]
+            return state, joypad, demo_frame
+        snapshot = self._pick_snapshot(level_tuple)
+        if snapshot is None:
+            return None
+        return snapshot, [self._NOOP_BYTE], None
+
     def _pick_snapshot(self, level):
-        """Return (snapshot or None, whether it came from a demonstration route)."""
-        if self._rng.random() >= self.prob:
-            return None, False
         frontier = self.frontier(level)
-        ahead = [snap for x_pos, snap in self._demo_states_for(level)
-                 if frontier is None or x_pos > frontier - self.back_min]
-        if ahead and self._rng.random() < 0.5:
-            return ahead[int(self._rng.integers(len(ahead)))], True
         if frontier is None:
-            return None, False
+            return None
         low, high = frontier - self.back_max, frontier - self.back_min
         candidates = [snap for key, snap in self._snapshots.get(level, {}).items()
                       if low <= key * self.bucket <= high]
         if not candidates:
-            return None, False
-        return candidates[int(self._rng.integers(len(candidates)))], False
+            return None
+        return candidates[int(self._rng.integers(len(candidates)))]
+
+    def _restore(self, state, byte: int):
+        """Load ``state`` and play one frame with ``byte``; return (obs, info) or None if that ended the episode."""
+        nes = self.env.unwrapped
+        nes.load_state(state)
+        # gym-super-mario-bros keeps reward trackers (last time, max x,
+        # score, coins) in Python; resync them with the restored RAM or the
+        # first step pays e.g. a huge time penalty.
+        nes._did_reset()
+        # The frame redraws the screen buffer so obs matches the state. Demo
+        # states replay the route's own byte: releasing A for even one frame
+        # mid-ascent makes SMB1 switch to falling gravity for the rest of the jump.
+        obs, _, terminated, truncated, info = nes.step(byte)
+        if terminated or truncated:
+            return None
+        return obs, info
+
+    def _finish_episode(self) -> Optional[Dict[str, Any]]:
+        """Book the episode that just ended; return its demo outcome, if it was a demo episode."""
+        # Skip resets with no steps since the last one (the construction-time
+        # seeding reset, a VecEnv's first reset): they'd record the start x as
+        # an episode end and drag the frontier back toward the level start.
+        if self._level is None or self._episode_steps == 0:
+            return None
+        if self._episode_demo is None:
+            self._episode_ends.setdefault(self._level, deque(maxlen=self._window)).append(self._episode_max_x)
+            return None
+        demo = self._episode_demo
+        return {'level': demo['level'], 'frame': demo['frame'], 'x': demo['x'],
+                'success': self._episode_max_x >= demo['goal_x']}
 
     def reset(self, *, seed=None, options=None):
-        """Reset normally, then maybe jump to a snapshot behind the frontier.
+        """Reset normally, then maybe jump to a demo state or a snapshot behind the frontier.
 
         Args:
             seed: Reseeds both the env and the restart RNG when given.
@@ -319,49 +524,55 @@ class FrontierStart(Wrapper):
 
         Returns:
             The (obs, info) tuple of the state the episode actually starts
-            from; ``info['frontier_start']`` tells whether it was restored.
+            from. ``info['frontier_start']`` tells whether a state was
+            restored and ``info['demo_start']`` whether it came from a demo
+            route; ``info['demo_outcome']`` (level, start frame, start x,
+            success) is present when the previous episode was a demo episode.
         """
         if seed is not None:
             self._rng = np.random.default_rng(seed)
-        # Skip resets with no steps since the last one (the construction-time
-        # seeding reset, a VecEnv's first reset): they'd record the start x as
-        # an episode end and drag the frontier back toward the level start.
-        if self._level is not None and self._episode_steps > 0 and not self._episode_from_demo:
-            self._episode_ends.setdefault(self._level, deque(maxlen=self._window)).append(self._episode_max_x)
+        outcome = self._finish_episode()
 
         obs, info = self.env.reset(seed=seed, options=options)
-        level = (info.get('world'), info.get('stage'))
+        level_tuple = (info.get('world'), info.get('stage'))
+        level = level_key(*level_tuple)
         if level in self._demo_routes and level not in self._demo_states:
             # The replay drives the emulator from its own reset, so redo the
             # episode reset afterwards.
             self._demo_states_for(level)
             obs, info = self.env.reset(options=options)
-        snapshot, from_demo = self._pick_snapshot(level)
-        restored = False
-        if snapshot is not None:
-            nes = self.env.unwrapped
-            nes.load_state(snapshot)
-            # gym-super-mario-bros keeps reward trackers (last time, max x,
-            # score, coins) in Python; resync them with the restored RAM or the
-            # first step pays e.g. a huge time penalty.
-            nes._did_reset()
-            # One idle frame redraws the screen buffer so obs matches the state.
-            obs, _, terminated, truncated, info = self.env.step(NOOP_ACTION)
-            if terminated or truncated:
+
+        self._episode_demo = None
+        self._forced.clear()
+        start = self._pick_start(level, level_tuple) if self._rng.random() < self.prob else None
+        restored = None
+        if start is not None:
+            state, joypad, demo_frame = start
+            restored = self._restore(state, joypad[0])
+            if restored is None:
                 obs, info = self.env.reset(options=options)
             else:
-                restored = True
+                obs, info = restored
+                self._forced.extend(joypad[1:])
+                if demo_frame is not None:
+                    self._episode_demo = {'level': level, 'frame': demo_frame,
+                                          'x': self._demo_states[level][demo_frame][2],
+                                          'goal_x': self._demo_routes[level]['waypoints'][-1]['x']}
 
         self._level = (info.get('world'), info.get('stage'))
         self._episode_max_x = info.get('x_pos', 0)
         self._episode_steps = 0
-        self._episode_from_demo = restored and from_demo
-        info['frontier_start'] = restored
-        info['demo_start'] = self._episode_from_demo
+        info['frontier_start'] = restored is not None
+        info['demo_start'] = self._episode_demo is not None
+        if outcome is not None:
+            info['demo_outcome'] = outcome
         return obs, info
 
     def step(self, action: int) -> StepReturn:  # type: ignore[override]
-        obs, reward, terminated, truncated, info = self.env.step(action)
+        if self._forced:
+            obs, reward, terminated, truncated, info = self.env.unwrapped.step(self._forced.popleft())
+        else:
+            obs, reward, terminated, truncated, info = self.env.step(action)
         level = (info.get('world'), info.get('stage'))
         x_pos = info.get('x_pos', 0)
         self._episode_steps += 1
@@ -369,7 +580,7 @@ class FrontierStart(Wrapper):
             self._episode_max_x = max(self._episode_max_x, x_pos)
         nes = self.env.unwrapped
         if (not (terminated or truncated) and not info.get('flag_get')
-                and nes.ram[self._FLOAT_STATE_ADDR] == 0 and not nes._is_dying):
+                and nes.ram[SMB1_FLOAT_STATE] == 0 and not nes._is_dying):
             self._snapshots.setdefault(level, {})[x_pos // self.bucket] = nes.dump_state()
         return obs, reward, terminated, truncated, info
 
@@ -501,7 +712,8 @@ def create_mario_env(
     noop_max: int = 30,
     stall_steps: int = 150,
     frontier_prob: float = 0.0,
-    demo_starts: bool = False
+    demo_starts: bool = False,
+    demo_warmup: int = 0
 ):
     """Create a Super Mario Bros environment with preprocessing wrappers.
 
@@ -523,9 +735,12 @@ def create_mario_env(
             is truncated; 0 disables the cutoff.
         frontier_prob: Fraction of resets that restart just behind where
             episodes usually end (see FrontierStart); 0 disables. Training only.
-        demo_starts: Also restart from the waypoints of this level's
-            demonstration route in ``demo_routes/``, if it has one. Only takes
-            effect when frontier_prob > 0.
+        demo_starts: Load this level's demonstration route from
+            ``demo_routes/``, if it has one, so frontier restarts can run a
+            reverse curriculum along it. Only takes effect when frontier_prob
+            > 0 and a ``ReverseCurriculum`` sets the start frame.
+        demo_warmup: Route frames replayed before the agent takes over after a
+            demo restart; ``create_vec_env`` sets ``demo_warmup_frames(frame_stack)``.
 
     Returns:
         The wrapped env with (84, 84, 1) uint8 observations, or a (wrapped env,
@@ -539,12 +754,13 @@ def create_mario_env(
 
     if frontier_prob > 0:
         route = load_demo_route(env_id) if demo_starts else None
-        env = FrontierStart(env, prob=frontier_prob, demo_routes=[route] if route else None)
+        env = FrontierStart(env, prob=frontier_prob, demo_routes=[route] if route else None,
+                            warmup_frames=demo_warmup)
 
     if use_custom_reward:
         env = CustomReward(env)
 
-    env = SkipFrame(env, skip=4)
+    env = SkipFrame(env, skip=FRAME_SKIP)
     if stall_steps > 0:
         env = StallTruncation(env, max_steps=stall_steps)
     env = TimeLimit(env, max_episode_steps=max_steps)
@@ -592,8 +808,9 @@ def create_vec_env(
         frontier_prob: Fraction of resets that restart just behind each
             worker's frontier; 0 disables. Episode stats from VecMonitor then
             mix full and partial episodes, so judge progress by evaluation.
-        demo_starts: Add demonstration-route waypoints to the restart points
-            of workers whose level has a route.
+        demo_starts: Load demonstration routes for workers whose level has
+            one; drive the curriculum with ``ReverseCurriculum`` and
+            ``env_method('set_demo_cursor', ...)``.
 
     Returns:
         A VecMonitor-wrapped VecEnv whose observations are
@@ -620,7 +837,8 @@ def create_vec_env(
                 noop_max=noop_max,
                 stall_steps=stall_steps,
                 frontier_prob=frontier_prob,
-                demo_starts=demo_starts
+                demo_starts=demo_starts,
+                demo_warmup=demo_warmup_frames(frame_stack)
             )
         return _init
 

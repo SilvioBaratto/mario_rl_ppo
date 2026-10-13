@@ -19,9 +19,11 @@ os.environ['SDL_AUDIODRIVER'] = 'dummy'
 
 from environments.env_factory import (
     DEFAULT_ENV_ID,
+    ReverseCurriculum,
     assign_levels,
     create_eval_env,
     create_vec_env,
+    demo_warmup_frames,
     load_demo_route,
     parse_levels,
 )
@@ -52,6 +54,51 @@ class CheckpointCallback(BaseCallback):
             self.model.save(str(checkpoint_path))
             if self.verbose > 0:
                 print(f"Checkpoint saved: {checkpoint_path.name}")
+        return True
+
+
+class ReverseCurriculumCallback(BaseCallback):
+    """Run a ``ReverseCurriculum`` against the training workers.
+
+    Reads each finished demo episode's outcome from the VecEnv's reset infos
+    (workers report it on the reset that follows the episode), and pushes the
+    start frame to every worker whenever it moves. TensorBoard gets
+    ``curriculum/<level>_start_frame`` (0 once a level's curriculum is done).
+    """
+
+    def __init__(self, curriculum, logger, verbose=0):
+        super().__init__(verbose)
+        self.curriculum = curriculum
+        self.log = logger
+
+    def _broadcast(self):
+        for level, frame in self.curriculum.cursors().items():
+            self.training_env.env_method('set_demo_cursor', level, frame)
+
+    def _on_training_start(self):
+        self._broadcast()
+
+    def _on_step(self):
+        # Only SubprocVecEnv/DummyVecEnv store reset infos; the wrappers SB3
+        # and create_vec_env add on top keep an unused copy of their own.
+        reset_infos = self.training_env.unwrapped.reset_infos
+        moved = False
+        for done, reset_info in zip(self.locals['dones'], reset_infos):
+            outcome = reset_info.get('demo_outcome') if done else None
+            if outcome is None:
+                continue
+            counts = self.curriculum.record(outcome)
+            if counts is not None:
+                moved = True
+                frame = self.curriculum.cursors()[outcome['level']]
+                where = f"frame {frame}" if frame is not None else "the level start (curriculum done)"
+                self.log.info(f"Curriculum {outcome['level']}: {counts[0]}/{counts[1]} reached the "
+                              f"route end from frame {outcome['frame']} (x={outcome['x']}); "
+                              f"now starting from {where} at {self.num_timesteps:,} steps")
+        if moved:
+            self._broadcast()
+        for level, frame in self.curriculum.cursors().items():
+            self.logger.record(f'curriculum/{level}_start_frame', frame or 0)
         return True
 
 
@@ -89,8 +136,9 @@ def parse_args():
                        help='Fraction of training resets that restart from a saved state just '
                             'behind where episodes usually end on that level (0 disables)')
     parser.add_argument('--demo-starts', action='store_true',
-                       help='With --frontier-starts, also restart from the waypoints of recorded '
-                            'demonstration routes (src/environments/demo_routes/<W>-<S>.json)')
+                       help='With --frontier-starts, run a reverse curriculum on levels with a '
+                            'recorded route (src/environments/demo_routes/<W>-<S>.json): their '
+                            'restarts begin near the route end and move back as the agent succeeds')
     parser.add_argument('--stall-steps', type=int, default=150,
                        help='Truncate an episode after this many agent steps without a new '
                             'furthest x (0 disables)')
@@ -133,13 +181,16 @@ def select_device(device_arg):
     return 'cpu'
 
 
-def create_callbacks(args, dirs, env_ids):
-    """Create training callbacks for checkpointing and evaluation.
+def create_callbacks(args, dirs, env_ids, curriculum, logger):
+    """Create training callbacks for checkpointing, evaluation and the demo curriculum.
 
     With several levels, each evaluation runs ``--eval-episodes`` episodes on
     every level and ``best_model`` tracks the mean reward across all of them.
     """
     callbacks = []
+
+    if curriculum is not None:
+        callbacks.append(ReverseCurriculumCallback(curriculum, logger))
 
     # Checkpoint callback
     callbacks.append(CheckpointCallback(
@@ -221,6 +272,7 @@ def main():
     logger.info(f"Evaluation: {args.eval_episodes} episodes every {args.eval_freq:,} steps; "
                 f"random NOOP starts up to {args.noop_max} frames; "
                 f"stall cutoff after {args.stall_steps} steps without progress")
+    curriculum = None
     if args.frontier_starts > 0:
         logger.info(f"Frontier starts: {args.frontier_starts:.0%} of training resets restart just behind "
                     f"each level's frontier (evaluation always starts at the level start)")
@@ -229,9 +281,15 @@ def main():
             parser_error = "--demo-starts needs --frontier-starts > 0; demo states are offered on frontier restarts"
             logger.error(parser_error)
             raise SystemExit(parser_error)
-        routes = {env_id: load_demo_route(env_id) for env_id in dict.fromkeys(env_ids)}
-        logger.info("Demo routes: " + ", ".join(
-            f"{env_id} ({len(r['waypoints'])} waypoints)" if r else f"{env_id} (none)" for env_id, r in routes.items()))
+        routes = [route for route in map(load_demo_route, dict.fromkeys(env_ids)) if route]
+        if routes:
+            curriculum = ReverseCurriculum(routes, warmup_frames=demo_warmup_frames(args.frame_stack))
+            logger.info("Reverse curriculum: " + ", ".join(
+                f"{level} from frame {frame}" for level, frame in curriculum.cursors().items())
+                + f"; steps back after {curriculum.required}/{curriculum.window} recent "
+                  f"episodes from the current start reach the route end (not resumed with --resume)")
+        else:
+            logger.warning("--demo-starts: none of the training levels has a demo route")
     logger.info("Custom reward shaping: score bonus, +50 flag, -50 per life lost, /10 scale")
 
     signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
@@ -305,7 +363,7 @@ def main():
             )
             remaining = args.total_timesteps
 
-        callbacks = create_callbacks(args, dirs, env_ids)
+        callbacks = create_callbacks(args, dirs, env_ids, curriculum, logger)
 
         logger.info(f"Starting training for {remaining:,} timesteps")
         print(f"\nTraining: {args.exp_name}")

@@ -103,19 +103,33 @@ point moves forward as the agent improves. Evaluation, `evaluate.py` and
 `play_and_record.py` always start at the real level start. With frontier starts enabled,
 `rollout/ep_rew_mean` mixes full and partial episodes, so judge progress by evaluation.
 
-#### Demonstration Starts (obstacles exploration can't find)
+#### Reverse Curriculum from a Demonstration (obstacles exploration can't find)
 Some obstacles need an action sequence the policy essentially never samples. In 1-3 the
 gap at x≈783 is only crossable with a *short* hop (A held 4-12 frames) onto an
 intermediate tree-top followed by a full jump; the agent always does a long jump onto a
 dead-end platform. `src/environments/demo_routes/1-3.json` records one successful route
 (frame-level joypad bytes from a fresh reset, with waypoint x positions that a replay must
-reproduce). With `--demo-starts`, each worker replays its level's route once and adds the
-waypoints to the frontier restart points while they lie ahead of the agent's frontier;
-demo-started episodes are excluded from the frontier statistics.
+reproduce).
+
+With `--demo-starts`, the frontier restarts on a level with a route run a reverse
+curriculum (Salimans & Chen, 2018, *Learning Montezuma's Revenge from a Single
+Demonstration*): each worker replays the route once and keeps an emulator state every 8
+frames (two agent steps), mid-jump included. Restarts begin at the current start frame
+(75%) or a later one (25%, rehearsal), and the start moves one state earlier each time 5 of
+the last 10 episodes from it reach the route's end. A restart lands 12 frames before its
+start frame and replays the route's inputs for the first three agent steps: the frame
+stack is zero-filled after every reset, and from a zero-padded stack the policy acts as at
+a level start and lets go of A, which in mid-jump cuts the jump short for good. Starting next to the goal and moving
+back, the agent only has to discover a couple of new decisions at a time, until it starts at
+the level start. `train.py` logs every move and writes `curriculum/<level>_start_frame` to
+TensorBoard; the position is not saved, so `--resume` starts the curriculum over (a trained
+policy walks back through the mastered part quickly). Placing the agent at the
+demonstration's waypoints alone did not work: it learned to play on from there, never the
+actions that get there.
 ```bash
-python train.py --resume runs/world1_frontier/checkpoints/best_model \
-  --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 3100000 \
-  --frontier-starts 0.5 --demo-starts --exp-name world1_demo
+python train.py --resume runs/world1_demo/checkpoints/best_model \
+  --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 4500000 \
+  --frontier-starts 0.5 --demo-starts --exp-name world1_reverse
 ```
 
 #### Expected Learning Curve (World 1-1)
@@ -307,7 +321,7 @@ Optimized hyperparameters for Mario (train.py):
 | `--noop-max` | 30 | Max random NOOP frames after each reset (0 disables) |
 | `--stall-steps` | 150 | Truncate an episode after this many steps without a new furthest x (0 disables) |
 | `--frontier-starts` | 0.0 | Fraction of training resets that restart just behind where episodes usually end (0 disables) |
-| `--demo-starts` | False | With `--frontier-starts`, also restart from waypoints of recorded demonstration routes |
+| `--demo-starts` | False | With `--frontier-starts`, run a reverse curriculum along recorded demonstration routes |
 | `--exp-name` | auto | Experiment name |
 | `--seed` | 42 | Random seed |
 | `--device` | auto | Device (cpu/cuda/mps/auto) |
