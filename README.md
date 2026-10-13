@@ -237,6 +237,21 @@ python play_and_record.py \
   --max-steps 10000
 ```
 
+#### Full Game (World 1 without losing a life)
+`SuperMarioBros-v0` is the whole game in one episode (3 lives, level transitions included;
+gym-super-mario-bros skips the intro of 1-2, so each level starts as in single-stage
+training). `--stop-at-level 2-1` ends the video once 1-4 is cleared, and the summary line
+says how many levels were cleared before the first life was lost:
+```bash
+python play_and_record.py --model-path runs/my_experiment/checkpoints/best_model \
+  --env-id SuperMarioBros-v0 --stop-at-level 2-1 --output world1.mp4
+# Over many episodes: "Levels cleared before the first life lost" and ">= N levels" counts
+python evaluate.py --model-path runs/my_experiment/checkpoints/best_model \
+  --env-id SuperMarioBros-v0 --n-episodes 20
+```
+A clean World 1 needs every level to be reliable on its own: at 90% per level, only
+0.9^4 ≈ 66% of runs get through all four without dying.
+
 #### Recording Arguments
 
 | Argument | Default | Description |
@@ -250,6 +265,7 @@ python play_and_record.py \
 | `--seed` | 42 | Random seed |
 | `--stochastic` | False | Sample actions instead of the deterministic policy |
 | `--device` | auto | Device to use (cpu/cuda/mps/auto) |
+| `--stop-at-level` | None | With `SuperMarioBros-v0`, end the recording when this level starts (e.g. `2-1`) |
 
 The script outputs:
 - Real-time progress updates every 100 steps

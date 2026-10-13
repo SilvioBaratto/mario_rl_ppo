@@ -16,7 +16,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from environments.env_factory import DEFAULT_ENV_ID, create_vec_env, episode_end_reason
+from environments.env_factory import DEFAULT_ENV_ID, GameProgress, create_vec_env, episode_end_reason, parse_levels
 from agents.ppo_agent import load_mario_model
 
 
@@ -44,12 +44,20 @@ def parse_args():
                        help='Sample actions instead of using the deterministic policy')
     parser.add_argument('--device', type=str, default='auto',
                        help='Device to use')
+    parser.add_argument('--stop-at-level', type=str, default=None,
+                       help='With a whole-game env id (SuperMarioBros-v0), end the recording when this '
+                            'level starts, e.g. 2-1 to show 1-1 through 1-4')
 
     return parser.parse_args()
 
 
-def record_game(agent, env, max_steps=5000, deterministic=True):
-    """Play one game and record frames"""
+def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
+    """Play one game and record frames.
+
+    Args:
+        stop_at: (world, stage) whose start ends the recording, or None to
+            play until the episode ends.
+    """
 
     print("Starting game...")
     frames = []
@@ -59,6 +67,7 @@ def record_game(agent, env, max_steps=5000, deterministic=True):
     total_reward = 0
     max_x_pos = 0
     info = {}
+    progress = GameProgress()
 
     while not done and step_count < max_steps:
         action, _ = agent.predict(obs, deterministic=deterministic)
@@ -74,6 +83,10 @@ def record_game(agent, env, max_steps=5000, deterministic=True):
 
         total_reward += reward
         step_count += 1
+        progress.update(info, bool(done))
+        if stop_at is not None and (info.get('world'), info.get('stage')) == stop_at:
+            print(f"Reached {stop_at[0]}-{stop_at[1]}; stopping the recording")
+            break
 
         if 'x_pos' in info:
             max_x_pos = max(max_x_pos, info['x_pos'])
@@ -96,6 +109,7 @@ def record_game(agent, env, max_steps=5000, deterministic=True):
     print(f"Total reward: {total_reward:.2f}")
     print(f"Max distance: {max_x_pos}")
     print(f"Status: {completion_status}")
+    print(f"Game: {progress.summary()}")
     print(f"Frames captured: {len(frames)}")
 
     return frames, {
@@ -155,7 +169,9 @@ def main():
         agent=agent,
         env=env,
         max_steps=args.max_steps,
-        deterministic=not args.stochastic
+        deterministic=not args.stochastic,
+        stop_at=tuple(int(n) for n in parse_levels(args.stop_at_level)[0].split('-')[1:3])
+        if args.stop_at_level else None
     )
 
     # Save video

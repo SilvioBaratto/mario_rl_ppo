@@ -26,7 +26,14 @@ from tqdm import tqdm
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from environments.env_factory import DEFAULT_ENV_ID, create_vec_env, episode_end_reason, parse_levels
+from environments.env_factory import (
+    DEFAULT_ENV_ID,
+    GameProgress,
+    create_vec_env,
+    episode_end_reason,
+    is_single_stage,
+    parse_levels,
+)
 from agents.ppo_agent import load_mario_model
 
 
@@ -68,8 +75,12 @@ def parse_args():
 
 
 def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
-                  video_dir=None, deterministic=True):
-    """Evaluate agent performance over multiple episodes"""
+                  video_dir=None, deterministic=True, whole_game=False):
+    """Evaluate agent performance over multiple episodes.
+
+    With ``whole_game`` (an id like 'SuperMarioBros-v0'), each episode also
+    reports the levels it reached and cleared and the lives it lost.
+    """
 
     results = {
         'episode_rewards': [],
@@ -94,6 +105,7 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
         frames = []
         max_x_pos = 0
         action_counts = {}
+        progress = GameProgress()
 
         while not done:
             action, _ = agent.predict(obs, deterministic=deterministic)
@@ -112,6 +124,7 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
 
             total_reward += reward
             episode_length += 1
+            progress.update(info, bool(done))
 
             if 'x_pos' in info:
                 max_x_pos = max(max_x_pos, info['x_pos'])
@@ -139,7 +152,10 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
             'flag_get': flag_get,
             'time': info.get('time', 0),
             'coins': info.get('coins', 0),
-            'score': info.get('score', 0)
+            'score': info.get('score', 0),
+            'levels_cleared': progress.levels_cleared,
+            'lives_lost': progress.lives_lost,
+            'clean_levels': progress.levels_cleared if progress.clean_levels is None else progress.clean_levels
         })
 
         if flag_get:
@@ -155,6 +171,8 @@ def evaluate_agent(agent, env, n_episodes, render=False, record_video=False,
               f"Length={episode_length}, {completion_status}, "
               f"Most common action: {most_common_action[0]} ({most_common_action[1]}/{episode_length} times)")
         print(f"  Action distribution: {dict(sorted(action_counts.items()))}")
+        if whole_game:
+            print(f"  Game: {progress.summary()}")
 
     results['success_rate'] = results['success_rate'] / n_episodes * 100
     results['avg_reward'] = np.mean(results['episode_rewards'])
@@ -178,6 +196,11 @@ def print_results(results):
     print(f"Max reward: {results['max_reward']:.2f}")
     print(f"Min reward: {results['min_reward']:.2f}")
     print(f"Max distance reached: {results['max_distance']}")
+    if results.get('whole_game'):
+        clean = [info['clean_levels'] for info in results['episode_info']]
+        print(f"Levels cleared before the first life lost: {clean}")
+        for n in range(1, max(clean) + 1):
+            print(f"  >= {n} level(s) without losing a life: {sum(c >= n for c in clean)}/{len(clean)}")
     print("=" * 50)
 
     print("\nPer-episode details:")
@@ -297,8 +320,10 @@ def main():
             render=args.render,
             record_video=args.record_video,
             video_dir=video_dir,
-            deterministic=deterministic
+            deterministic=deterministic,
+            whole_game=not is_single_stage(env_id)
         )
+        results['whole_game'] = not is_single_stage(env_id)
         print_results(results)
         results_by_env[env_id] = results
         env.close()
