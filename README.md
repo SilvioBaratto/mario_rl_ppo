@@ -107,9 +107,13 @@ point moves forward as the agent improves. Evaluation, `evaluate.py` and
 Some obstacles need an action sequence the policy essentially never samples. In 1-3 the
 gap at x≈783 is only crossable with a *short* hop (A held 4-12 frames) onto an
 intermediate tree-top followed by a full jump; the agent always does a long jump onto a
-dead-end platform. `src/environments/demo_routes/1-3.json` records one successful route
-(frame-level joypad bytes from a fresh reset, with waypoint x positions that a replay must
-reproduce).
+dead-end platform. `src/environments/demo_routes/1-3.json` records one successful route to
+the flag (frame-level joypad bytes from a fresh reset, with waypoint x positions that a replay
+must reproduce). A route must not end in a doomed state: an earlier version stopped 15 px
+before a tree's edge at full speed, every action from there died at x≈957, and the agent
+learned to follow it into the pit. Its open-loop actions reach the flag after every even NOOP
+offset but die at x=1724 after odd ones: agent steps are 4 frames, so an episode's frame
+parity is fixed, and the timing there differs by one frame.
 
 With `--demo-starts`, the frontier restarts on a level with a route run a reverse
 curriculum (Salimans & Chen, 2018, *Learning Montezuma's Revenge from a Single

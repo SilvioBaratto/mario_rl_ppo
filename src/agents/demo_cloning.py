@@ -57,7 +57,7 @@ def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
                     stack[..., -1:] = frame
                     max_x = max(max_x, info['x_pos'])
                     if terminated or truncated:
-                        failed = True
+                        failed = not info.get('flag_get')
                         break
                 if failed or max_x < goal_x:
                     warnings.warn(f"{route['env_id']} agent_actions miss the route end after {noop} NOOP "
