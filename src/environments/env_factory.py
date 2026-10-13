@@ -53,7 +53,9 @@ def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
 
     Routes live in ``demo_routes/<world>-<stage>.json``: frame-level joypad
     bytes from a fresh, NOOP-free reset plus waypoints (frame index and the
-    x position the replay must reach there).
+    x position the replay must reach there). An optional ``agent_actions``
+    list gives the same route as SIMPLE_MOVEMENT indices per agent step,
+    for behaviour cloning.
 
     Args:
         env_id: e.g. 'SuperMarioBros-1-3-v0'.

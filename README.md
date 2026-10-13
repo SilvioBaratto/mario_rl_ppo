@@ -126,10 +126,21 @@ TensorBoard; the position is not saved, so `--resume` starts the curriculum over
 policy walks back through the mastered part quickly). Placing the agent at the
 demonstration's waypoints alone did not work: it learned to play on from there, never the
 actions that get there.
+
+The curriculum alone still stops where a decision has essentially zero probability under
+the policy: in 1-3 it stalled at frame 184, where Mario must *not* press A while landing on
+the tree-top (SMB1 only jumps on a fresh A press) and then hold A for 7 steps. The policy
+presses A in mid-air with probability ~0.9995, so no rollout ever showed PPO the
+alternative. `--demo-bc N` adds behaviour cloning: routes carry `agent_actions` (the same
+route as one SIMPLE_MOVEMENT action per agent step), `build_demo_dataset` plays them
+through the training observation pipeline once per NOOP offset 0..`--noop-max`, and
+`DemoCloningCallback` takes N cross-entropy steps on those pairs before every rollout
+(`demo/bc_loss`, `demo/bc_accuracy` in TensorBoard). With 10 steps the curriculum crossed
+frame 184 and the hop within 10k steps after being stuck there for 1.9M.
 ```bash
-python train.py --resume runs/world1_demo/checkpoints/best_model \
-  --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 4500000 \
-  --frontier-starts 0.5 --demo-starts --exp-name world1_reverse
+python train.py --resume runs/world1_reverse/checkpoints/best_model \
+  --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 6500000 \
+  --frontier-starts 0.5 --demo-starts --demo-bc 10 --exp-name world1_bc
 ```
 
 #### Expected Learning Curve (World 1-1)
@@ -322,6 +333,7 @@ Optimized hyperparameters for Mario (train.py):
 | `--stall-steps` | 150 | Truncate an episode after this many steps without a new furthest x (0 disables) |
 | `--frontier-starts` | 0.0 | Fraction of training resets that restart just behind where episodes usually end (0 disables) |
 | `--demo-starts` | False | With `--frontier-starts`, run a reverse curriculum along recorded demonstration routes |
+| `--demo-bc` | 0 | Behaviour-cloning steps on routes' `agent_actions` before every rollout (0 disables) |
 | `--exp-name` | auto | Experiment name |
 | `--seed` | 42 | Random seed |
 | `--device` | auto | Device (cpu/cuda/mps/auto) |

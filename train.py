@@ -27,6 +27,7 @@ from environments.env_factory import (
     load_demo_route,
     parse_levels,
 )
+from agents.demo_cloning import DemoCloningCallback, build_demo_dataset
 from agents.ppo_agent import load_mario_model, mario_policy_kwargs
 from utils.logger import setup_logger
 
@@ -139,6 +140,9 @@ def parse_args():
                        help='With --frontier-starts, run a reverse curriculum on levels with a '
                             'recorded route (src/environments/demo_routes/<W>-<S>.json): their '
                             'restarts begin near the route end and move back as the agent succeeds')
+    parser.add_argument('--demo-bc', type=int, default=0,
+                       help='Behaviour-cloning gradient steps on the agent_actions of recorded routes '
+                            'after every PPO update (0 disables); for decisions exploration never finds')
     parser.add_argument('--stall-steps', type=int, default=150,
                        help='Truncate an episode after this many agent steps without a new '
                             'furthest x (0 disables)')
@@ -181,8 +185,8 @@ def select_device(device_arg):
     return 'cpu'
 
 
-def create_callbacks(args, dirs, env_ids, curriculum, logger):
-    """Create training callbacks for checkpointing, evaluation and the demo curriculum.
+def create_callbacks(args, dirs, env_ids, curriculum, demo_data, logger):
+    """Create training callbacks for checkpointing, evaluation and demonstration learning.
 
     With several levels, each evaluation runs ``--eval-episodes`` episodes on
     every level and ``best_model`` tracks the mean reward across all of them.
@@ -191,6 +195,9 @@ def create_callbacks(args, dirs, env_ids, curriculum, logger):
 
     if curriculum is not None:
         callbacks.append(ReverseCurriculumCallback(curriculum, logger))
+    if demo_data is not None:
+        callbacks.append(DemoCloningCallback(*demo_data, steps=args.demo_bc, batch_size=args.batch_size,
+                                             seed=args.seed))
 
     # Checkpoint callback
     callbacks.append(CheckpointCallback(
@@ -290,6 +297,16 @@ def main():
                   f"episodes from the current start reach the route end (not resumed with --resume)")
         else:
             logger.warning("--demo-starts: none of the training levels has a demo route")
+    demo_data = None
+    if args.demo_bc > 0:
+        routes = [route for route in map(load_demo_route, dict.fromkeys(env_ids))
+                  if route and 'agent_actions' in route]
+        if routes:
+            demo_data = build_demo_dataset(routes, frame_stack=args.frame_stack, max_noop=args.noop_max)
+            logger.info(f"Behaviour cloning: {args.demo_bc} steps per update on {len(demo_data[1]):,} "
+                        f"demonstration pairs from " + ", ".join(r['env_id'] for r in routes))
+        else:
+            logger.warning("--demo-bc: none of the training levels has a route with agent_actions")
     logger.info("Custom reward shaping: score bonus, +50 flag, -50 per life lost, /10 scale")
 
     signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
@@ -363,7 +380,7 @@ def main():
             )
             remaining = args.total_timesteps
 
-        callbacks = create_callbacks(args, dirs, env_ids, curriculum, logger)
+        callbacks = create_callbacks(args, dirs, env_ids, curriculum, demo_data, logger)
 
         logger.info(f"Starting training for {remaining:,} timesteps")
         print(f"\nTraining: {args.exp_name}")
