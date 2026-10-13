@@ -147,6 +147,25 @@ python train.py --resume runs/world1_reverse/checkpoints/best_model \
   --frontier-starts 0.5 --demo-starts --demo-bc 10 --exp-name world1_bc
 ```
 
+#### Finding a Route (`find_route.py`)
+A level without a route can get one by searching the emulator directly, no trained policy
+needed. Each search is Go-Explore style: an archive keeps, per 16×16 px cell of Mario's
+position, the emulator state and the shortest known action sequence reaching it; restored
+cells are expanded with random sticky actions biased to the right, until a step reports
+`flag_get` (in castles, touching the axe). Open-loop routes depend on the NOOP offset (on
+1-3 and 1-4 the same actions fail after some offsets), so the tool replays every
+flag route after NOOP offsets 0..`--max-noop` and keeps the one that works for the most;
+behaviour cloning then uses exactly those offsets. The output is deterministic for a given
+`--seed`/`--searches`/`--budget`.
+```bash
+python find_route.py --level 1-4 --searches 21   # writes src/environments/demo_routes/1-4.json
+```
+For 1-4 every search reached the axe within seconds; the kept route (288 steps, over Bowser
+from the lift) works after 28 of 31 offsets, the next best after 15. Snapshots of 1-4 are
+not perfectly restorable in nes-py (a restored state with identical RAM can diverge hundreds
+of frames later); the curriculum only needs playable states, so this does not matter for
+training.
+
 #### Expected Learning Curve (World 1-1)
 Measured with the defaults on an Apple M4 (8 envs, MPS, single seed): the
 deterministic policy first clears 1-1 at 800k steps (10/10 evaluation episodes,
