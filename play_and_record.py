@@ -68,6 +68,7 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
     max_x_pos = 0
     info = {}
     progress = GameProgress()
+    stopped = False
 
     while not done and step_count < max_steps:
         action, _ = agent.predict(obs, deterministic=deterministic)
@@ -86,6 +87,7 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
         progress.update(info, bool(done))
         if stop_at is not None and (info.get('world'), info.get('stage')) == stop_at:
             print(f"Reached {stop_at[0]}-{stop_at[1]}; stopping the recording")
+            stopped = True
             break
 
         if 'x_pos' in info:
@@ -102,7 +104,12 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
 
     # Game summary
     flag_get = info.get('flag_get', False)
-    completion_status = "FLAG GET!" if flag_get else f"{episode_end_reason(info)} at x={max_x_pos}"
+    if stopped:
+        completion_status = f"Reached {stop_at[0]}-{stop_at[1]} (recording stopped)"
+    elif flag_get:
+        completion_status = "FLAG GET!"
+    else:
+        completion_status = f"{episode_end_reason(info)} at x={max_x_pos}"
 
     print("\nGame finished!")
     print(f"Steps: {step_count}")
