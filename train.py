@@ -117,7 +117,8 @@ def parse_args():
                        help='Train one policy on several levels, e.g. 1-1,1-2,1-3 (overrides '
                             '--env-id); workers are split round-robin across the list, so '
                             'repeating a level (1-1,1-2,1-3,1-3) gives it more workers and '
-                            'more weight in best_model selection')
+                            'more weight in best_model selection; "game" adds whole-game '
+                            'workers, which reach later levels the way an evaluation run does')
     parser.add_argument('--num-envs', type=int, default=8)
     parser.add_argument('--frame-stack', type=int, default=4)
     parser.add_argument('--total-timesteps', type=int, default=10_000_000,

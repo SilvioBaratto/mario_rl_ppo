@@ -47,6 +47,9 @@ FRAME_SKIP = 4
 # snapshots are only taken then, so a restart never begins in a doomed fall.
 SMB1_FLOAT_STATE = 0x001D
 
+# Raw screen rows of the SMB1 status bar; the playfield starts at row 32.
+HUD_ROWS = 32
+
 
 def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
     """Return the recorded demonstration route for a single-stage env id, if one exists.
@@ -73,10 +76,11 @@ def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
 
 
 def parse_levels(spec: str) -> List[str]:
-    """Convert a level list such as '1-1,1-2,1-3' into single-stage env ids.
+    """Convert a level list such as '1-1,1-2,1-3' into env ids.
 
     Args:
-        spec: Comma-separated WORLD-STAGE pairs, world 1-8 and stage 1-4.
+        spec: Comma-separated WORLD-STAGE pairs (world 1-8, stage 1-4), or
+            'game' for the whole game from 1-1 ('SuperMarioBros-v0').
 
     Returns:
         Env ids in the given order, e.g. ['SuperMarioBros-1-1-v0', ...].
@@ -86,9 +90,13 @@ def parse_levels(spec: str) -> List[str]:
     """
     env_ids = []
     for item in (part.strip() for part in spec.split(',')):
+        if item == 'game':
+            env_ids.append('SuperMarioBros-v0')
+            continue
         match = re.fullmatch(r'([1-8])-([1-4])', item)
         if not match:
-            raise ValueError(f"Invalid level {item!r}; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4)")
+            raise ValueError(f"Invalid level {item!r}; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) "
+                             f"or 'game'")
         env_ids.append(f'SuperMarioBros-{match.group(1)}-{match.group(2)}-v0')
     if not env_ids:
         raise ValueError("Level list is empty")
@@ -112,19 +120,67 @@ def assign_levels(env_ids: EnvIds, num_envs: int) -> List[str]:
 
 
 class SkipFrame(Wrapper):
-    """Skip frames - execute action every skip frames (Kaggle implementation)"""
+    """Repeat each action for ``skip`` frames, ending the step early when the level changes.
+
+    In the whole game a level starts mid-step, and the rest of the step would
+    replay an action chosen while the previous level was on screen: entering
+    1-3 that way made Mario jump at x=40 and meet the tree-top Koopa at a bad
+    moment in every greedy run, although single-stage 1-3 (where the first
+    input is chosen from the level's own first frame) was cleared every time.
+    Single-stage episodes end at the flag, so they never hit the early exit.
+    The step that ends early reports ``info['level_start']``, which
+    ``LevelStartFrameStack`` uses to clear the frame history.
+    """
     def __init__(self, env: gym.Env, skip: int = 4):
         super().__init__(env)
         self._skip = skip
+        self._level = None
+
+    def reset(self, **kwargs):
+        """Reset the env and remember which level the episode starts on."""
+        obs, info = self.env.reset(**kwargs)
+        self._level = (info.get('world'), info.get('stage'))
+        return obs, info
 
     def step(self, action: int) -> StepReturn:  # type: ignore[override]
         total_reward = 0.0
         for _ in range(self._skip):
             obs, reward, terminated, truncated, info = self.env.step(action)
             total_reward += float(reward)
-            if terminated or truncated:
+            level = (info.get('world'), info.get('stage'))
+            changed = level != self._level
+            self._level = level
+            if changed and not (terminated or truncated):
+                info['level_start'] = True
+            if terminated or truncated or changed:
                 break
         return obs, total_reward, terminated, truncated, info
+
+
+class LevelStartFrameStack(VecFrameStack):
+    """``VecFrameStack`` (channels last) that also clears an env's history when a new level starts mid-episode.
+
+    A single-stage episode begins with a zero-filled stack, so the policy
+    learned every level's first moves from that. In the whole game the stack
+    would still hold the previous level's last screens and change the first
+    decisions on the new level (at 1-2's start: run instead of jump). Steps
+    flagged ``info['level_start']`` by ``SkipFrame`` get the same zero fill.
+    """
+
+    def step_wait(self):
+        """Step the envs, stack frames, and zero the older frames of envs that just entered a level.
+
+        Returns:
+            The usual (observations, rewards, dones, infos) of ``VecFrameStack``.
+        """
+        observations, rewards, dones, infos = super().step_wait()
+        frame = self.venv.observation_space.shape[-1]
+        for idx, info in enumerate(infos):
+            if info.get('level_start') and not dones[idx]:
+                # update() returns its own buffer, so this clears the kept history too.
+                self.stacked_obs.stacked_obs[idx, ..., :-frame] = 0
+                observations[idx, ..., :-frame] = 0
+        return observations, rewards, dones, infos
 
 
 def episode_end_reason(info: Dict[str, Any]) -> str:
@@ -665,10 +721,16 @@ class FrontierStart(Wrapper):
 
 
 class GrayResizeObservation(ObservationWrapper):
-    """Convert RGB frames to a square grayscale uint8 image.
+    """Convert RGB frames to a square grayscale uint8 image with the status bar blanked.
 
     cv2 does conversion and resize in ~0.3 ms; gymnasium's GrayscaleObservation
     alone takes ~0.56 ms because it computes the weighted sum in float64 NumPy.
+
+    The top ``HUD_ROWS`` raw rows (score, coins, world, time) are set to black.
+    Policies trained with the status bar visible keyed on its digits (freezing
+    just the score and coin display cut greedy 1-1 clears from 17 to 6 of 31
+    NOOP offsets), and in the whole game the score and coins carried over from
+    earlier levels never occur on the single-stage levels they train on.
     """
     def __init__(self, env: gym.Env, size: int = 84):
         super().__init__(env)
@@ -685,6 +747,7 @@ class GrayResizeObservation(ObservationWrapper):
             The converted frame.
         """
         gray = cv2.cvtColor(observation, cv2.COLOR_RGB2GRAY)
+        gray[:HUD_ROWS] = 0
         return cv2.resize(gray, (self._size, self._size), interpolation=cv2.INTER_AREA)[:, :, None]
 
 
@@ -929,7 +992,7 @@ def create_vec_env(
     vec_env = VecMonitor(vec_env)
 
     if frame_stack > 1:
-        vec_env = VecFrameStack(vec_env, n_stack=frame_stack, channels_order='last')
+        vec_env = LevelStartFrameStack(vec_env, n_stack=frame_stack, channels_order='last')
 
     return vec_env
 
