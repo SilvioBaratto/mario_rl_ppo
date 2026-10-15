@@ -72,6 +72,85 @@ def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
     return np.stack(all_obs), np.asarray(all_actions, dtype=np.int64)
 
 
+def build_game_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
+                            max_noop: int = 30) -> Tuple[np.ndarray, np.ndarray]:
+    """Chain consecutive routes through the whole game and keep the pairs after the first level.
+
+    A whole-game run enters 1-2 a few frames further into Mario's drop than
+    any single-stage reset plus NOOPs, with the enemies where a 1-frame
+    offset puts them. That phase never occurs in single-stage training, and
+    a policy that cleared single-stage 1-2 18/20 failed it in 40/40 whole-game
+    runs, while the 1-2 route replayed open-loop from that same entry still
+    reaches the flag. These pairs are those whole-game states.
+
+    The chain plays each route's ``agent_actions`` from the game start (after
+    0..``max_noop`` NOOP frames), idles through the level end until
+    ``SkipFrame`` reports ``level_start``, zero-fills the frame stack like
+    ``LevelStartFrameStack``, and continues with the next route. Pairs from the
+    first route are left out: its states are the single-stage ones. A chain
+    stops at the first route that loses a life or misses its level end.
+
+    Args:
+        routes: Routes with ``agent_actions`` for consecutive levels of one
+            world, first level first (e.g. 1-1, 1-2, 1-3, 1-4).
+        frame_stack: Frames per observation, as in training.
+        max_noop: Largest NOOP offset at the game start.
+
+    Returns:
+        (observations, actions) shaped like ``build_demo_dataset``'s; every
+        offset contributes its own copy, so the chain weighs about as much as
+        one single-stage route in the cloning batches.
+    """
+    all_obs, all_actions = [], []
+    env = create_mario_env('SuperMarioBros-v0', noop_max=0, stall_steps=0, use_custom_reward=False,
+                           max_steps=sum(len(route['agent_actions']) for route in routes) + 2000)
+    try:
+        for noop in range(max_noop + 1):
+            frame, info = env.reset()
+            nes = env.unwrapped
+            for _ in range(noop):
+                nes.step(0)
+            if noop:
+                frame = env.observation(nes.screen)
+            stack = np.zeros(frame.shape[:2] + (frame_stack,), dtype=np.uint8)
+            stack[..., -1:] = frame
+            life = info['life']
+            for index, route in enumerate(routes):
+                level = (info.get('world'), info.get('stage'))
+                obs, done = [], False
+                for action in route['agent_actions']:
+                    obs.append(stack.transpose(2, 0, 1).copy())
+                    frame, _, terminated, truncated, info = env.step(action)
+                    stack = np.roll(stack, -1, axis=-1)
+                    stack[..., -1:] = frame
+                    done = terminated or truncated or info['life'] < life
+                    # The next level can begin inside the agent step that touched
+                    # the flag, and then no returned info shows flag_get.
+                    moved_on = (info.get('world'), info.get('stage')) != level
+                    if info.get('flag_get') or moved_on or done:
+                        break
+                ok = (bool(info.get('flag_get')) or moved_on) and not info['life'] < life
+                while ok and not done and (info.get('world'), info.get('stage')) == level:
+                    frame, _, terminated, truncated, info = env.step(0)
+                    stack = np.roll(stack, -1, axis=-1)
+                    stack[..., -1:] = frame
+                    done = terminated or truncated
+                if not ok or (done and index + 1 < len(routes)):
+                    warnings.warn(f"game chain after {noop} NOOP frames: {route['env_id']} route fails from the "
+                                  f"whole-game entry (x={info.get('x_pos')}); stopping that chain")
+                    break
+                if index:
+                    all_obs.extend(obs)
+                    all_actions.extend(route['agent_actions'][:len(obs)])
+                if info.get('level_start'):
+                    stack[..., :-1] = 0
+    finally:
+        env.close()
+    if not all_obs:
+        return np.zeros((0, frame_stack, 84, 84), dtype=np.uint8), np.zeros(0, dtype=np.int64)
+    return np.stack(all_obs), np.asarray(all_actions, dtype=np.int64)
+
+
 class DemoCloningCallback(BaseCallback):
     """Take a few behaviour-cloning steps on demonstration pairs after every PPO update.
 

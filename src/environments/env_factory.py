@@ -128,30 +128,42 @@ class SkipFrame(Wrapper):
     moment in every greedy run, although single-stage 1-3 (where the first
     input is chosen from the level's own first frame) was cleared every time.
     Single-stage episodes end at the flag, so they never hit the early exit.
-    The step that ends early reports ``info['level_start']``, which
-    ``LevelStartFrameStack`` uses to clear the frame history.
+
+    From the frame the flag is touched until the next level starts, every
+    frame gets no buttons. The game ignores input during the end sequence
+    except on the frame the next level begins, which already moves Mario:
+    the agent's last 1-1 action (run + jump) used to start 1-2 with Mario
+    at speed 2 and A held (SMB1 only jumps on a fresh press), a state no
+    demonstration or single-stage reset has. The step that ends early reports
+    ``info['level_start']``, which ``LevelStartFrameStack`` uses to clear the
+    frame history.
     """
     def __init__(self, env: gym.Env, skip: int = 4):
         super().__init__(env)
         self._skip = skip
         self._level = None
+        self._ending = False
 
     def reset(self, **kwargs):
         """Reset the env and remember which level the episode starts on."""
         obs, info = self.env.reset(**kwargs)
         self._level = (info.get('world'), info.get('stage'))
+        self._ending = False
         return obs, info
 
     def step(self, action: int) -> StepReturn:  # type: ignore[override]
         total_reward = 0.0
         for _ in range(self._skip):
-            obs, reward, terminated, truncated, info = self.env.step(action)
+            obs, reward, terminated, truncated, info = self.env.step(NOOP_ACTION if self._ending else action)
             total_reward += float(reward)
+            self._ending = self._ending or bool(info.get('flag_get'))
             level = (info.get('world'), info.get('stage'))
             changed = level != self._level
             self._level = level
-            if changed and not (terminated or truncated):
-                info['level_start'] = True
+            if changed:
+                self._ending = False
+                if not (terminated or truncated):
+                    info['level_start'] = True
             if terminated or truncated or changed:
                 break
         return obs, total_reward, terminated, truncated, info

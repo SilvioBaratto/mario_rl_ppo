@@ -27,7 +27,7 @@ from environments.env_factory import (
     load_demo_route,
     parse_levels,
 )
-from agents.demo_cloning import DemoCloningCallback, build_demo_dataset
+from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
 from agents.ppo_agent import load_mario_model, mario_policy_kwargs
 from utils.logger import setup_logger
 
@@ -328,6 +328,19 @@ def main():
                         f"demonstration pairs from " + ", ".join(r['env_id'] for r in routes))
         else:
             logger.warning("--demo-bc: none of the training levels has a route with agent_actions")
+        if 'SuperMarioBros-v0' in env_ids:
+            chain = []
+            for stage in range(1, 5):
+                route = load_demo_route(f'SuperMarioBros-1-{stage}-v0')
+                if not route or 'agent_actions' not in route:
+                    break
+                chain.append(route)
+            game_data = build_game_demo_dataset(chain, frame_stack=args.frame_stack, max_noop=args.noop_max)
+            logger.info(f"Behaviour cloning: {len(game_data[1]):,} whole-game pairs from chaining the "
+                        f"{len(chain)} world-1 routes (levels after 1-1, as a whole-game run enters them)")
+            if len(game_data[1]):
+                demo_data = game_data if demo_data is None else tuple(
+                    np.concatenate(parts) for parts in zip(demo_data, game_data))
     logger.info("Custom reward shaping: score bonus, +50 flag, -50 per life lost, /10 scale")
 
     signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
