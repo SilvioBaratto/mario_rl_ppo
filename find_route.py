@@ -41,7 +41,8 @@ def parse_args():
     parser.add_argument('--level', type=str, required=True, help='Level to search, e.g. 1-4')
     parser.add_argument('--searches', type=int, default=20,
                        help='Independent searches (seeds); the most NOOP-robust flag route is kept')
-    parser.add_argument('--budget', type=int, default=60_000, help='Agent steps per search')
+    parser.add_argument('--budget', type=int, default=60_000,
+                       help='Agent steps per search; each spends all of them and returns its shortest flag route')
     parser.add_argument('--workers', type=int, default=4, help='Searches run in parallel')
     parser.add_argument('--max-noop', type=int, default=30,
                        help='Robustness is checked for NOOP offsets 0..this (match --noop-max)')
@@ -67,7 +68,7 @@ def _agent_step(nes, byte):
 
 
 def go_explore(env_id, budget, seed):
-    """Search for a flag-reaching action sequence from a NOOP-free reset.
+    """Search for the shortest flag-reaching action sequence from a NOOP-free reset.
 
     Go-Explore style: an archive keeps, per ``CELL_PX`` x ``CELL_PX`` cell of
     Mario's position within an area, the shortest known action sequence
@@ -76,14 +77,21 @@ def go_explore(env_id, budget, seed):
     random sticky actions. Leaving the level other than by its flag (a warp
     zone) counts as a dead end.
 
+    The search spends the whole budget instead of stopping at the first flag:
+    the first route carries the detours of early exploration (1-2's spent 74
+    steps wandering among the block columns at its start, and a policy cloned
+    from it looped there), while later flags extend archive prefixes that
+    have since been shortened.
+
     Args:
         env_id: Single-stage env id.
-        budget: Agent steps to spend before giving up.
+        budget: Agent steps to spend.
         seed: Seed of the exploration RNG.
 
     Returns:
-        SIMPLE_MOVEMENT indices ending on the frame that reports ``flag_get``
-        (world-over in castles), or None when the budget ran out.
+        The shortest found SIMPLE_MOVEMENT indices ending on the frame that
+        reports ``flag_get`` (world-over in castles), or None when no flag was
+        reached within the budget.
     """
     warnings.filterwarnings('ignore')
     rng = np.random.default_rng(seed)
@@ -109,6 +117,7 @@ def go_explore(env_id, budget, seed):
 
     archive = {cell_of(info): {'state': nes.dump_state(), 'actions': [], 'x': progress(info), 'visits': 0}}
     steps = 0
+    best = None
     while steps < budget:
         cells = list(archive)
         xs = np.array([archive[c]['x'] for c in cells], dtype=float)
@@ -127,7 +136,9 @@ def go_explore(env_id, budget, seed):
             steps += 1
             actions.append(action)
             if info.get('flag_get'):
-                return actions
+                if best is None or len(actions) < len(best):
+                    best = list(actions)
+                break
             if done or (info['world'], info['stage']) != level:
                 break
             cell = cell_of(info)
@@ -135,7 +146,7 @@ def go_explore(env_id, budget, seed):
             if old is None or len(actions) < len(old['actions']):
                 archive[cell] = {'state': nes.dump_state(), 'actions': list(actions), 'x': progress(info),
                                  'visits': old['visits'] if old else 0}
-    return None
+    return best
 
 
 def _search_worker(job):
@@ -223,10 +234,10 @@ def build_route(env_id, actions, ok_offsets, max_noop, searches):
         'env_id': env_id,
         'description': (
             f"Found by find_route.py: Go-Explore style emulator search (archive of states per {CELL_PX}x{CELL_PX} "
-            f"px cell, random sticky actions, shortest path kept per cell) from a fresh reset with no NOOPs; the "
-            f"most offset-robust flag route of {searches} searches. frames is agent_actions expanded to "
-            f"{FRAME_SKIP} joypad bytes per step, cut at the flag frame. agent_actions reaches the flag after "
-            f"{len(ok_offsets)} of the {max_noop + 1} NOOP offsets 0-{max_noop}"
+            f"px cell, random sticky actions, shortest path kept per cell, shortest flag route within the budget) "
+            f"from a fresh reset with no NOOPs; the most offset-robust flag route of {searches} searches. "
+            f"frames is agent_actions expanded to {FRAME_SKIP} joypad bytes per step, cut at the flag frame. "
+            f"agent_actions reaches the flag after {len(ok_offsets)} of the {max_noop + 1} NOOP offsets 0-{max_noop}"
             + (f" (not {', '.join(map(str, failing))})." if failing else ".")),
         'frames': frames,
         'waypoints': waypoints,
