@@ -140,6 +140,11 @@ def parse_args():
                        help='With --frontier-starts, run a reverse curriculum on levels with a '
                             'recorded route (src/environments/demo_routes/<W>-<S>.json): their '
                             'restarts begin near the route end and move back as the agent succeeds')
+    parser.add_argument('--demo-start-frames', type=str, default=None,
+                       help="With --demo-starts, comma-separated level:frame start points such as "
+                            "'1-1:520,1-4:272' instead of the route ends; the curriculum position is "
+                            "not saved in checkpoints, so pass the last logged "
+                            "curriculum/<level>_start_frame values when resuming")
     parser.add_argument('--demo-bc', type=int, default=0,
                        help='Behaviour-cloning gradient steps on the agent_actions of recorded routes '
                             'after every PPO update (0 disables); for decisions exploration never finds')
@@ -280,6 +285,8 @@ def main():
                 f"random NOOP starts up to {args.noop_max} frames; "
                 f"stall cutoff after {args.stall_steps} steps without progress")
     curriculum = None
+    if args.demo_start_frames and not args.demo_starts:
+        raise SystemExit("--demo-start-frames needs --demo-starts")
     if args.frontier_starts > 0:
         logger.info(f"Frontier starts: {args.frontier_starts:.0%} of training resets restart just behind "
                     f"each level's frontier (evaluation always starts at the level start)")
@@ -289,12 +296,25 @@ def main():
             logger.error(parser_error)
             raise SystemExit(parser_error)
         routes = [route for route in map(load_demo_route, dict.fromkeys(env_ids)) if route]
+        start_frames = None
+        if args.demo_start_frames:
+            start_frames = {}
+            for item in args.demo_start_frames.split(','):
+                level, _, frame = item.strip().partition(':')
+                if not frame.isdigit():
+                    raise SystemExit(f"--demo-start-frames: expected level:frame, got {item!r}")
+                start_frames[level] = int(frame)
         if routes:
-            curriculum = ReverseCurriculum(routes, warmup_frames=demo_warmup_frames(args.frame_stack))
+            try:
+                curriculum = ReverseCurriculum(routes, warmup_frames=demo_warmup_frames(args.frame_stack),
+                                               start_frames=start_frames)
+            except ValueError as err:
+                raise SystemExit(f"--demo-start-frames: {err}")
             logger.info("Reverse curriculum: " + ", ".join(
-                f"{level} from frame {frame}" for level, frame in curriculum.cursors().items())
+                f"{level} from frame {frame}" if frame is not None else f"{level} done"
+                for level, frame in curriculum.cursors().items())
                 + f"; steps back after {curriculum.required}/{curriculum.window} recent "
-                  f"episodes from the current start reach the route end (not resumed with --resume)")
+                  f"episodes from the current start reach the route end")
         else:
             logger.warning("--demo-starts: none of the training levels has a demo route")
     demo_data = None

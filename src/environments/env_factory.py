@@ -401,15 +401,28 @@ class ReverseCurriculum:
         threshold: Fraction of the last ``window`` episodes from the current
             start that must reach the route's end before stepping back.
         window: Number of recent outcomes from the current start considered.
+        start_frames: Optional 'W-S' level -> route frame to begin at instead of
+            the route end, e.g. the last logged ``curriculum/<level>_start_frame``
+            of a run being resumed (the position is not saved in checkpoints).
+            A frame between start frames rounds down to the earlier one; one
+            before the first start frame (the logged 0) marks the level done.
+
+    Raises:
+        ValueError: If ``start_frames`` names a level without a route.
     """
 
     def __init__(self, routes: Sequence[Dict[str, Any]], warmup_frames: int,
-                 threshold: float = 0.5, window: int = 10):
+                 threshold: float = 0.5, window: int = 10,
+                 start_frames: Optional[Dict[str, int]] = None):
         self.window = window
         self.required = max(1, int(np.ceil(threshold * window)))
         self._frames = {route_level(route): demo_start_frames(route, warmup_frames=warmup_frames)
                         for route in routes}
         self._index = {level: len(frames) - 1 for level, frames in self._frames.items()}
+        for level, frame in (start_frames or {}).items():
+            if level not in self._frames:
+                raise ValueError(f"no demo route for level {level} (routes: {', '.join(self._frames)})")
+            self._index[level] = sum(f <= frame for f in self._frames[level]) - 1
         self._outcomes = {level: deque(maxlen=window) for level in self._frames}
 
     def cursors(self) -> Dict[str, Optional[int]]:
