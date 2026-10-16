@@ -53,10 +53,13 @@ test-slow:
 test:
 	pytest -q
 
+# Runs in a throwaway directory: a training run writes runs/<exp-name>/, and a smoke test must
+# never overwrite or leave behind anything in the repository's own runs/.
 smoke:
-	mario train --total-timesteps 2048 --num-envs 2 --eval-freq 0 --device cpu \
-		--exp-name smoke
-	test -f runs/smoke/checkpoints/final_model.zip
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && cd "$$tmp" && \
+		mario train --total-timesteps 2048 --num-envs 2 --eval-freq 0 --device cpu \
+			--exp-name smoke && \
+		test -f runs/smoke/checkpoints/final_model.zip && echo "smoke run ok"
 
 docker-check:
 	docker build -t mario-rl-ppo .
