@@ -483,16 +483,11 @@ from src.agents.ppo_agent import mario_policy_kwargs
 from stable_baselines3 import PPO
 
 # Create environment (run from the repo root; SubprocVecEnv needs a __main__ guard)
-env = create_vec_env(
-    num_envs=8,
-    env_id='SuperMarioBros-1-1-v0',
-    frame_stack=4,
-    seed=42
-)
+env = create_vec_env(num_envs=8, env_id="SuperMarioBros-1-1-v0", frame_stack=4, seed=42)
 
 # Create PPO agent
 agent = PPO(
-    'CnnPolicy',
+    "CnnPolicy",
     env,
     learning_rate=1e-4,
     n_steps=512,
@@ -503,16 +498,16 @@ agent = PPO(
     clip_range=0.2,
     ent_coef=0.01,
     policy_kwargs=mario_policy_kwargs(),
-    tensorboard_log='./logs',
-    device='auto',
-    verbose=1
+    tensorboard_log="./logs",
+    device="auto",
+    verbose=1,
 )
 
 # Train
 agent.learn(total_timesteps=10_000_000)
 
 # Save
-agent.save('my_mario_model')
+agent.save("my_mario_model")
 ```
 
 ### Loading and Using Trained Models
@@ -522,10 +517,10 @@ from src.environments.env_factory import create_vec_env
 from src.agents.ppo_agent import load_mario_model
 
 # Create environment
-env = create_vec_env(num_envs=1, env_id='SuperMarioBros-1-1-v0')
+env = create_vec_env(num_envs=1, env_id="SuperMarioBros-1-1-v0")
 
 # Load model (.zip optional)
-agent = load_mario_model('runs/my_exp/checkpoints/best_model', env=env)
+agent = load_mario_model("runs/my_exp/checkpoints/best_model", env=env)
 
 # Run agent
 obs = env.reset()
