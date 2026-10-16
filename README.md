@@ -1,66 +1,65 @@
 # Super Mario Bros Reinforcement Learning with PPO
 
-A production-ready implementation of Proximal Policy Optimization (PPO) for training an AI agent to play Super Mario Bros. This project features a custom CNN architecture, comprehensive evaluation tools, and a modular codebase designed for experimentation and research.
+[![CI](https://github.com/SilvioBaratto/mario_rl_ppo/actions/workflows/ci.yml/badge.svg)](https://github.com/SilvioBaratto/mario_rl_ppo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](pyproject.toml)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+
+A PPO agent ([Stable Baselines3](https://stable-baselines3.readthedocs.io/)) that learns Super Mario Bros from pixels with `gym-super-mario-bros`. It trains on one level or several, can practise hard obstacles from emulator snapshots, learns from recorded demonstration routes with a reverse curriculum and behaviour cloning, and clears World 1 in the whole game without losing a life.
+
+> A research project, not a library. The pinned dependencies, the emulator's determinism and the saved checkpoints are part of what it reproduces: see [Development](#development) for the tests that guard them.
 
 ## Features
 
-### Core Implementation
-- **PPO Algorithm**: Stable and sample-efficient policy gradient method from Stable Baselines3
-- **Custom CNN Architecture**: Purpose-built feature extractor optimized for frame-based observations
-- **Vectorized Training**: Parallel environment execution for improved sample efficiency
-- **Advanced Preprocessing**: Grayscale conversion, frame stacking, native Gymnasium API
-
-### Production Features
-- **Modular Architecture**: Clean separation of agents, environments, and utilities
-- **Comprehensive Evaluation**: Detailed metrics, video recording, and performance analysis
-- **Flexible Configuration**: YAML-based configs and extensive command-line options
-- **Experiment Management**: Automatic directory structure, checkpointing, and logging
-- **Graceful Shutdown**: Signal handling to save models on interruption
-- **Multiple Backends**: TensorBoard and Weights & Biases integration
+- **PPO from pixels**: Stable Baselines3 with a small custom CNN on four stacked 84×84 grayscale frames
+- **Vectorized training** in worker processes, on one level or one policy across several levels
+- **Frontier starts** and a **reverse curriculum** along recorded demonstration routes, plus **behaviour cloning** for decisions that exploration never finds
+- **Route search**: `mario find-route` finds a demonstration with a Go-Explore style emulator search
+- **Evaluation and recording**: per-level success rates, whole-game runs counted by lives lost, MP4 videos
+- **Layered package** (`domain`, `application`, `infrastructure`, `cli`) with a dependency rule enforced by a test, and golden traces that prove a refactor leaves training, evaluation and checkpoints untouched
+- **Experiment management**: a directory per run with checkpoints, TensorBoard logs, graceful save on Ctrl+C or SIGTERM
 
 ## Installation
 
 ### Prerequisites
 - Python 3.13+ (required by gym-super-mario-bros 9.x / nes-py 9.x)
-- pip
 - (Optional) Docker and Docker Compose
-- (Optional) CUDA-compatible GPU for faster training
+- (Optional) A CUDA GPU, or Apple Silicon (MPS), for faster training
 
-### Setup (Local)
+### Setup (local)
 
 ```bash
-# Clone the repository
-git clone https://github.com/SilvioBaratto/mario-rl-ppo.git
-cd mario-rl-ppo
+git clone https://github.com/SilvioBaratto/mario_rl_ppo
+cd mario_rl_ppo
 
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# The pinned runtime, then the package (editable) with the dev tools
+make install
+```
+
+`make install` runs `pip install -r requirements.txt` and `pip install -e ".[dev]"`. On Linux the default torch wheel pulls several GB of CUDA libraries; for a CPU-only machine install torch first from the CPU index:
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
+make install
 ```
 
 ### Setup (Docker)
 
 ```bash
-# Clone the repository
-git clone https://github.com/SilvioBaratto/mario-rl-ppo.git
-cd mario-rl-ppo
-
-# Build the Docker image
 docker-compose build
 ```
 
-### Verify Installation
+### Verify the installation
 
 ```bash
-# Local: Quick test run (100k timesteps, 2 environments)
-python train.py --total-timesteps 100000 --num-envs 2 --exp-name test_run
-
-# Docker: Quick test run
-docker-compose run --rm train python train.py --total-timesteps 100000 --num-envs 2 --exp-name test_run
+mario --version
+mario train --total-timesteps 2048 --num-envs 2 --eval-freq 0 --exp-name smoke   # `make smoke`
 ```
+
+The `mario` command is also available as `python -m mario`.
 
 ## Quick Start
 
@@ -69,17 +68,17 @@ docker-compose run --rm train python train.py --total-timesteps 100000 --num-env
 #### Basic Training
 ```bash
 # Train with default settings (10M timesteps, 8 parallel environments)
-python train.py --total-timesteps 10000000 --num-envs 8 --exp-name my_experiment
+mario train --total-timesteps 10000000 --num-envs 8 --exp-name my_experiment
 ```
 
 #### Multi-Level Training
 ```bash
 # One policy trained on 1-1, 1-2 and 1-3 together; workers are split round-robin
 # across the levels, so use a multiple of the level count for --num-envs
-python train.py --levels 1-1,1-2,1-3 --num-envs 9 --total-timesteps 3000000 --exp-name world1_multi
+mario train --levels 1-1,1-2,1-3 --num-envs 9 --total-timesteps 3000000 --exp-name world1_multi
 
 # Per-level report, including an unseen level to measure generalization
-python evaluate.py --model-path runs/world1_multi/checkpoints/best_model --levels 1-1,1-2,1-3,1-4
+mario evaluate --model-path runs/world1_multi/checkpoints/best_model --levels 1-1,1-2,1-3,1-4
 ```
 Each evaluation during training runs `--eval-episodes` episodes on every level, and
 `best_model` tracks the mean reward across them. Repeating a level weights it: with
@@ -93,21 +92,21 @@ and x≈230 on 1-4.
 ```bash
 # Half of the training resets restart from a saved emulator state 50-400 px behind the
 # point where recent episodes on that level usually end
-python train.py --levels 1-1,1-2,1-3 --num-envs 9 --frontier-starts 0.5 --exp-name world1_frontier
+mario train --levels 1-1,1-2,1-3 --num-envs 9 --frontier-starts 0.5 --exp-name world1_frontier
 ```
 Episodes otherwise always restart at the level start, so an obstacle deep in a level (the
 tall tree-top jump at x≈783 in 1-3) is attempted once per long run-up the agent has already
 mastered. `FrontierStart` snapshots the emulator whenever Mario stands on solid ground and
 tracks each level's frontier (median furthest x of the last 20 episodes), so the restart
-point moves forward as the agent improves. Evaluation, `evaluate.py` and
-`play_and_record.py` always start at the real level start. With frontier starts enabled,
+point moves forward as the agent improves. Evaluation, `mario evaluate` and
+`mario record` always start at the real level start. With frontier starts enabled,
 `rollout/ep_rew_mean` mixes full and partial episodes, so judge progress by evaluation.
 
 #### Reverse Curriculum from a Demonstration (obstacles exploration can't find)
 Some obstacles need an action sequence the policy essentially never samples. In 1-3 the
 gap at x≈783 is only crossable with a *short* hop (A held 4-12 frames) onto an
 intermediate tree-top followed by a full jump; the agent always does a long jump onto a
-dead-end platform. `src/environments/demo_routes/1-3.json` records one successful route to
+dead-end platform. `mario/infrastructure/demo_routes/1-3.json` records one successful route to
 the flag (frame-level joypad bytes from a fresh reset, with waypoint x positions that a replay
 must reproduce). A route must not end in a doomed state: an earlier version stopped 15 px
 before a tree's edge at full speed, every action from there died at x≈957, and the agent
@@ -125,7 +124,7 @@ start frame and replays the route's inputs for the first three agent steps: the 
 stack is zero-filled after every reset, and from a zero-padded stack the policy acts as at
 a level start and lets go of A, which in mid-jump cuts the jump short for good. Starting next to the goal and moving
 back, the agent only has to discover a couple of new decisions at a time, until it starts at
-the level start. `train.py` logs every move and writes `curriculum/<level>_start_frame` to
+the level start. `mario train` logs every move and writes `curriculum/<level>_start_frame` to
 TensorBoard; the position is not saved, so `--resume` starts the curriculum over (a trained
 policy walks back through the mastered part quickly). Placing the agent at the
 demonstration's waypoints alone did not work: it learned to play on from there, never the
@@ -142,12 +141,12 @@ through the training observation pipeline once per NOOP offset 0..`--noop-max`, 
 (`demo/bc_loss`, `demo/bc_accuracy` in TensorBoard). With 10 steps the curriculum crossed
 frame 184 and the hop within 10k steps after being stuck there for 1.9M.
 ```bash
-python train.py --resume runs/world1_reverse/checkpoints/best_model \
+mario train --resume runs/world1_reverse/checkpoints/best_model \
   --levels 1-1,1-2,1-3,1-3,1-3 --num-envs 9 --total-timesteps 6500000 \
   --frontier-starts 0.5 --demo-starts --demo-bc 10 --exp-name world1_bc
 ```
 
-#### Finding a Route (`find_route.py`)
+#### Finding a Route (`mario find-route`)
 A level without a route can get one by searching the emulator directly, no trained policy
 needed. Each search is Go-Explore style: an archive keeps, per 16×16 px cell of Mario's
 position, the emulator state and the shortest known action sequence reaching it; restored
@@ -158,7 +157,7 @@ flag route after NOOP offsets 0..`--max-noop` and keeps the one that works for t
 behaviour cloning then uses exactly those offsets. The output is deterministic for a given
 `--seed`/`--searches`/`--budget`.
 ```bash
-python find_route.py --level 1-4 --searches 21   # writes src/environments/demo_routes/1-4.json
+mario find-route --level 1-4 --searches 21   # writes mario/infrastructure/demo_routes/1-4.json
 ```
 For 1-4 every search reached the axe within seconds; the kept route (288 steps, over Bowser
 from the lift) works after 28 of 31 offsets, the next best after 15. Snapshots of 1-4 are
@@ -175,7 +174,7 @@ the flag once within 1M steps, so keep the default 10 epochs.
 #### Resume Training
 ```bash
 # Continue a run until it reaches 20M total timesteps (the step counter carries over)
-python train.py \
+mario train \
   --resume runs/my_experiment/checkpoints/checkpoint_10000000 \
   --total-timesteps 20000000 \
   --exp-name my_experiment_continued
@@ -186,7 +185,7 @@ python train.py \
 #### Basic Evaluation
 ```bash
 # Evaluate a trained model over 10 episodes
-python evaluate.py \
+mario evaluate \
   --model-path runs/my_experiment/checkpoints/best_model \
   --n-episodes 10
 ```
@@ -194,7 +193,7 @@ python evaluate.py \
 #### Evaluation with Video Recording
 ```bash
 # Record videos of evaluation episodes
-python evaluate.py \
+mario evaluate \
   --model-path runs/my_experiment/checkpoints/best_model \
   --n-episodes 10 \
   --record-video \
@@ -204,7 +203,7 @@ python evaluate.py \
 #### Live Rendering
 ```bash
 # Watch the agent play in real-time
-python evaluate.py \
+mario evaluate \
   --model-path runs/my_experiment/checkpoints/best_model \
   --render \
   --n-episodes 5
@@ -212,19 +211,19 @@ python evaluate.py \
 
 ### Recording Gameplay Videos
 
-The `play_and_record.py` script provides a simple way to record a single gameplay episode with a trained model.
+`mario record` provides a simple way to record a single gameplay episode with a trained model.
 
 #### Basic Recording
 ```bash
 # Record one game with auto-generated filename
-python play_and_record.py \
+mario record \
   --model-path runs/my_experiment/checkpoints/best_model
 ```
 
 #### Custom Output Path
 ```bash
 # Specify output video path
-python play_and_record.py \
+mario record \
   --model-path runs/my_experiment/checkpoints/best_model \
   --output my_mario_gameplay.mp4
 ```
@@ -232,7 +231,7 @@ python play_and_record.py \
 #### Extended Recording
 ```bash
 # Record with higher step limit for longer episodes
-python play_and_record.py \
+mario record \
   --model-path runs/my_experiment/checkpoints/best_model \
   --max-steps 10000
 ```
@@ -243,10 +242,10 @@ gym-super-mario-bros skips the intro of 1-2, so each level starts as in single-s
 training). `--stop-at-level 2-1` ends the video once 1-4 is cleared, and the summary line
 says how many levels were cleared before the first life was lost:
 ```bash
-python play_and_record.py --model-path runs/my_experiment/checkpoints/best_model \
+mario record --model-path runs/my_experiment/checkpoints/best_model \
   --env-id SuperMarioBros-v0 --stop-at-level 2-1 --output world1.mp4
 # Over many episodes: "Levels cleared before the first life lost" and ">= N levels" counts
-python evaluate.py --model-path runs/my_experiment/checkpoints/best_model \
+mario evaluate --model-path runs/my_experiment/checkpoints/best_model \
   --env-id SuperMarioBros-v0 --n-episodes 20
 ```
 A clean World 1 needs every level to be reliable on its own: at 90% per level, only
@@ -275,37 +274,35 @@ The script outputs:
 ## Project Structure
 
 ```
-mario-rl-ppo/
-├── src/
-│   ├── agents/
-│   │   ├── __init__.py
-│   │   └── ppo_agent.py          # PPO implementation with custom CNN
-│   ├── environments/
-│   │   ├── __init__.py
-│   │   └── env_factory.py        # Environment wrappers and VecEnv factories
-│   └── utils/
-│       ├── __init__.py
-│       └── logger.py             # Logging utilities
-├── runs/                          # Training outputs (auto-generated)
-│   └── <exp_name>/
-│       ├── checkpoints/          # Model checkpoints
-│       ├── logs/                 # TensorBoard logs
-│       └── videos/               # Training evaluation videos
-├── train.py                      # Main training script
-├── evaluate.py                   # Evaluation script
-├── play_and_record.py            # Video recording script
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Docker image definition
-├── docker-compose.yml            # Docker Compose configuration
-├── .gitignore                    # Git ignore rules
-└── README.md                     # This file
+mario_rl_ppo/
+├── mario/
+│   ├── domain/            # Pure rules: config constants, levels, route arithmetic,
+│   │                      #   the reverse curriculum, episode summaries
+│   ├── application/       # Use cases: evaluate_agent, record_game
+│   ├── infrastructure/    # Adapters: Gymnasium wrappers, vec envs, FrontierStart,
+│   │   │                  #   MarioCNN and model loading, behaviour cloning,
+│   │   │                  #   SB3 callbacks, route search, logging
+│   │   └── demo_routes/   # Recorded routes for 1-1 to 1-4 (package data)
+│   └── cli/               # `mario train | evaluate | record | find-route`
+├── tests/                 # Unit tests, golden traces (tests/golden) and the layering test
+├── runs/                  # Training outputs (git-ignored)
+├── pyproject.toml         # Package metadata, dependencies, ruff/pytest/pyright config
+├── requirements.txt       # Exact pins used by Docker and CI
+├── Makefile               # lint, tests, smoke run, container checks
+├── Dockerfile
+├── docker-compose.yml
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── CLAUDE.md              # Design notes for the emulator pipeline, curriculum and checkpoints
 ```
+
+**The dependency rule.** `domain` imports nothing from the package and only numpy from outside it. `application` and `infrastructure` import only `domain`. `cli` is the composition root and may import all of them. `tests/test_layering.py` reads every module's imports with `ast` and fails on a violation.
 
 ## Architecture
 
 ### Custom CNN Feature Extractor
 
-The `MarioCNN` class (src/agents/ppo_agent.py) implements a custom convolutional neural network optimized for Super Mario Bros:
+The `MarioCNN` class (`mario/infrastructure/model.py`) implements a custom convolutional neural network optimized for Super Mario Bros:
 
 **Architecture**:
 - **Conv Layer 1**: 32 filters, 3x3 kernel, stride 2, padding 1
@@ -336,7 +333,7 @@ The `MarioCNN` class (src/agents/ppo_agent.py) implements a custom convolutional
 
 ### PPO Hyperparameters
 
-Optimized hyperparameters for Mario (train.py):
+Hyperparameters for Mario (`mario/domain/config.py`, plus the two flags):
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
@@ -354,7 +351,7 @@ Optimized hyperparameters for Mario (train.py):
 
 ## Command Line Arguments
 
-### Training (train.py)
+### Training (`mario train`)
 
 | Argument | Default | Description |
 |----------|---------|-------------|
@@ -378,7 +375,7 @@ Optimized hyperparameters for Mario (train.py):
 | `--device` | auto | Device (cpu/cuda/mps/auto) |
 | `--resume` | None | Path to checkpoint to resume from (.zip optional) |
 
-### Evaluation (evaluate.py)
+### Evaluation (`mario evaluate`)
 
 | Argument | Default | Description |
 |----------|---------|-------------|
@@ -399,30 +396,31 @@ Optimized hyperparameters for Mario (train.py):
 
 ## Results
 
-### Evaluation Metrics
+The reference model is `runs/world1_game3/checkpoints/checkpoint_17894136` (17.9M steps), trained with `--levels 1-1,1-2,1-2,1-3,1-4,game,game,game,game,game --num-envs 10 --frontier-starts 0.5 --demo-starts --demo-bc 10`. It clears World 1 in the whole game without losing a life; `CLAUDE.md` has the full numbers (31/31 greedy NOOP offsets, 15/30 stochastic).
 
-The evaluation script provides comprehensive metrics:
-- **Episode Rewards**: Total reward per episode
-- **Episode Lengths**: Number of steps per episode
-- **Success Rate**: Percentage of episodes where Mario reaches the flag
-- **Max Distance**: Furthest x-position reached
-- **Action Distribution**: Analysis of action usage
+Single-stage greedy play, 10 episodes per level, produced by
 
-### Example Output
-
+```bash
+mario evaluate --model-path runs/world1_game3/checkpoints/checkpoint_17894136 \
+  --levels 1-1,1-2,1-3,1-4 --n-episodes 10 --device cpu --seed 42
 ```
-==================================================
-EVALUATION RESULTS
-==================================================
-Episodes evaluated: 10
-Success rate: 80.0%
-Average reward: 2847.50 +/- 324.18
-Average episode length: 512.3 +/- 89.7
-Max reward: 3200.00
-Min reward: 2100.00
-Max distance reached: 3161
-==================================================
-```
+
+| Level | Success | Average reward | Best x |
+|-------|---------|----------------|--------|
+| 1-1 | 100% | 314.85 | 3161 |
+| 1-2 | 90% | 282.82 | 3161 |
+| 1-3 | 100% | 255.61 | 2425 |
+| 1-4 | 90% | 216.74 | 2244 |
+
+Every number here comes from a run of that command, not from memory; re-run it and update the table from its output. A checkpoint is not tracked in git, so the command needs your own `runs/` directory.
+
+### Evaluation metrics
+
+`mario evaluate` reports, per level and in a JSON file (`eval_results_ppo_<timestamp>.json`):
+- **Episode rewards and lengths**, and their mean and standard deviation
+- **Success rate**: the percentage of episodes where Mario reaches the flag
+- **Max distance**: the furthest x position reached
+- **Action distribution** per episode, and for whole-game ids the levels cleared before the first life lost
 
 ## Training Tips
 
@@ -430,12 +428,12 @@ Max distance reached: 3161
 
 1. **Use 8+ parallel environments**: Improves sample efficiency
    ```bash
-   python train.py --num-envs 8
+   mario train --num-envs 8
    ```
 
 2. **Train for 10M+ timesteps**: Mario requires substantial training
    ```bash
-   python train.py --total-timesteps 10000000
+   mario train --total-timesteps 10000000
    ```
 
 3. **Monitor with TensorBoard**: Track training progress
@@ -445,7 +443,7 @@ Max distance reached: 3161
 
 4. **Save frequently during long training**: Protect against interruptions
    ```bash
-   python train.py --save-freq 50000
+   mario train --save-freq 50000
    ```
 
 ### Troubleshooting
@@ -454,7 +452,7 @@ Max distance reached: 3161
 - `--device auto` picks MPS, the fastest option here: on an Apple M4 with 8 envs, ~450 steps/s on MPS vs ~155 steps/s on CPU, because the PPO update is bound by the CNN
 - If MPS misbehaves, fall back to CPU (about 3x slower):
   ```bash
-  python train.py --device cpu
+  mario train --device cpu
   ```
 
 #### Low Performance After Training
@@ -478,11 +476,11 @@ Max distance reached: 3161
 ### Custom Training with Python API
 
 ```python
-from src.environments.env_factory import create_vec_env
-from src.agents.ppo_agent import mario_policy_kwargs
+from mario.infrastructure.factory import create_vec_env
+from mario.infrastructure.model import mario_policy_kwargs
 from stable_baselines3 import PPO
 
-# Create environment (run from the repo root; SubprocVecEnv needs a __main__ guard)
+# Create environment (SubprocVecEnv re-imports your script, so keep this under an `if __name__ == "__main__":` guard)
 env = create_vec_env(num_envs=8, env_id="SuperMarioBros-1-1-v0", frame_stack=4, seed=42)
 
 # Create PPO agent
@@ -512,9 +510,11 @@ agent.save("my_mario_model")
 
 ### Loading and Using Trained Models
 
+Always load through `load_mario_model`: checkpoints pickle the CNN under an import path that no longer exists, and only its `policy_kwargs` override makes them load (ruff bans a plain `PPO.load`).
+
 ```python
-from src.environments.env_factory import create_vec_env
-from src.agents.ppo_agent import load_mario_model
+from mario.infrastructure.factory import create_vec_env
+from mario.infrastructure.model import load_mario_model
 
 # Create environment
 env = create_vec_env(num_envs=1, env_id="SuperMarioBros-1-1-v0")
@@ -569,15 +569,15 @@ docker build -t mario-rl-ppo .
 
 # Train
 docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-  python train.py --total-timesteps 10000000 --device cpu --exp-name docker_run
+  mario train --total-timesteps 10000000 --device cpu --exp-name docker_run
 
-# Evaluate
-docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-  python evaluate.py --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
+# Evaluate (the report is written to the working directory, so run it inside runs/)
+docker run --rm -v $(pwd)/runs:/app/runs -w /app/runs mario-rl-ppo \
+  mario evaluate --model-path /app/runs/docker_run/checkpoints/best_model --n-episodes 10
 
 # Record video
 docker run --rm -v $(pwd)/runs:/app/runs -v $(pwd)/videos:/app/videos mario-rl-ppo \
-  python play_and_record.py --model-path runs/docker_run/checkpoints/best_model
+  mario record --model-path runs/docker_run/checkpoints/best_model --output videos/docker_run.mp4
 ```
 
 ## Experiment Management
@@ -594,13 +594,12 @@ runs/<exp_name>/
 │   ├── checkpoint_200000.zip
 │   └── final_model.zip          # Final model after training
 ├── logs/
-│   └── PPO_1/                   # TensorBoard logs
-│       ├── events.out.tfevents.*
-│       └── ...
-├── videos/
-│   ├── eval-SuperMarioBros-v0-episode-0.mp4
-│   └── ...
-└── config.yaml                  # Configuration used for this run
+│   ├── PPO_1/                   # TensorBoard logs
+│   │   ├── events.out.tfevents.*
+│   │   └── ...
+│   └── training_<timestamp>.log
+├── evaluations.npz              # Evaluation history (EvalCallback)
+└── videos/                      # Created empty; the evaluation CLI writes its own videos
 ```
 
 ### Checkpointing Strategy
@@ -650,29 +649,27 @@ Automatic device selection in order of preference:
 
 ## Development
 
-### Running Tests
-
 ```bash
-# Install development dependencies
-pip install pytest black flake8
-
-# Run tests (if implemented)
-pytest
-
-# Format code
-black .
-
-# Check code style
-flake8 src/ train.py evaluate.py
+make install        # pinned runtime, the package, and the dev extra (pytest, ruff, pyright)
+make lint           # ruff check, ruff format --check, pyright
+make test-fast      # tests that need no emulator
+make test-emulator  # short emulator tests: raw routes, the wrapped env, the whole game
+make test-slow      # every NOOP offset, worker processes, the checkpoint and a training run
+make smoke          # a 2,048-step training run on two workers
+make docker-check   # build the image; check the routes, permissions and compose file
 ```
+
+### The golden traces
+
+`tests/golden` holds traces captured from the code before it was restructured: the public API and command-line defaults, the demonstration routes, the wrapped environment for every NOOP offset 0-30 on 1-1 to 1-4, the chained whole-game run, vec-env rollouts, behaviour-cloning datasets, the reference checkpoint, a short training run with resume, and an evaluation report. The tests replay the current code against them, so a refactor that changes training, evaluation or checkpoint loading fails a test.
+
+- Exact values (rewards, infos, emulator state) must match on every platform. Hashes of pixels and tensors depend on the OpenCV and BLAS builds and are compared only on the platform that captured them.
+- Tests that need `runs/world1_game3/...` skip when the checkpoint is absent.
+- Never regenerate a golden inside a refactor commit. If behaviour has to change on purpose, change the golden in its own commit and say why (`python -m tests.capture_golden <name>`).
 
 ### Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short: a test first, `make lint` and `make test-fast` green, one focused commit per change in [Conventional Commits](https://www.conventionalcommits.org/) style.
 
 ## References
 
@@ -688,7 +685,7 @@ flake8 src/ train.py evaluate.py
 
 ## License
 
-MIT License - see LICENSE file for details
+[MIT License](LICENSE)
 
 ## Acknowledgments
 
