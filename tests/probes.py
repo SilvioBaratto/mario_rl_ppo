@@ -154,7 +154,7 @@ def cli_surface() -> dict[str, Any]:
 def route_files() -> dict[str, Any]:
     """Byte hashes and shape of the shipped demonstration routes."""
     files = {}
-    for path in sorted(a.DEMO_ROUTES_DIR.glob("*.json")):
+    for path in sorted(a.ROUTES_DIR.glob("*.json")):
         route = json.loads(path.read_text())
         files[path.name] = {
             "sha256": sha(path.read_bytes()),

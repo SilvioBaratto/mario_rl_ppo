@@ -8,17 +8,18 @@ import re
 import signal
 import warnings
 from collections import deque
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any
 
-import gymnasium as gym
-from gymnasium import spaces
-from gymnasium.core import Wrapper, ObservationWrapper
-from gymnasium.wrappers import TimeLimit
-import numpy as np
 import cv2
 import gym_super_mario_bros
+import gymnasium as gym
+import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+from gymnasium import spaces
+from gymnasium.core import ObservationWrapper, Wrapper
+from gymnasium.wrappers import TimeLimit
 from nes_py.wrappers import JoypadSpace
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
@@ -29,12 +30,12 @@ from stable_baselines3.common.vec_env import (
 )
 
 # Gymnasium step return: (obs, reward, terminated, truncated, info)
-StepReturn = Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]
+StepReturn = tuple[np.ndarray, float, bool, bool, dict[str, Any]]
 
 DEFAULT_ENV_ID = "SuperMarioBros-1-1-v0"
 NOOP_ACTION = SIMPLE_MOVEMENT.index(["NOOP"])
 
-EnvIds = Union[str, Sequence[str]]
+EnvIds = str | Sequence[str]
 
 DEMO_ROUTES_DIR = Path(__file__).with_name("demo_routes")
 # Two agent steps between reverse-curriculum start states: fine enough that
@@ -51,7 +52,7 @@ SMB1_FLOAT_STATE = 0x001D
 HUD_ROWS = 32
 
 
-def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
+def load_demo_route(env_id: str) -> dict[str, Any] | None:
     """Return the recorded demonstration route for a single-stage env id, if one exists.
 
     Routes live in ``demo_routes/<world>-<stage>.json``: frame-level joypad
@@ -75,7 +76,7 @@ def load_demo_route(env_id: str) -> Optional[Dict[str, Any]]:
     return json.loads(path.read_text())
 
 
-def parse_levels(spec: str) -> List[str]:
+def parse_levels(spec: str) -> list[str]:
     """Convert a level list such as '1-1,1-2,1-3' into env ids.
 
     Args:
@@ -105,7 +106,7 @@ def parse_levels(spec: str) -> List[str]:
     return env_ids
 
 
-def assign_levels(env_ids: EnvIds, num_envs: int) -> List[str]:
+def assign_levels(env_ids: EnvIds, num_envs: int) -> list[str]:
     """Return the env id each of ``num_envs`` workers plays, round-robin.
 
     Args:
@@ -175,7 +176,7 @@ class SkipFrame(Wrapper):
 
 
 class LevelStartFrameStack(VecFrameStack):
-    """``VecFrameStack`` (channels last) that also clears an env's history when a new level starts mid-episode.
+    """Channels-last ``VecFrameStack`` that clears an env's history when a level starts mid-episode.
 
     A single-stage episode begins with a zero-filled stack, so the policy
     learned every level's first moves from that. In the whole game the stack
@@ -200,7 +201,7 @@ class LevelStartFrameStack(VecFrameStack):
         return observations, rewards, dones, infos
 
 
-def episode_end_reason(info: Dict[str, Any]) -> str:
+def episode_end_reason(info: dict[str, Any]) -> str:
     """Describe why an episode that did not reach the flag ended.
 
     Args:
@@ -218,7 +219,7 @@ def episode_end_reason(info: Dict[str, Any]) -> str:
 
 
 def is_single_stage(env_id: str) -> bool:
-    """Tell whether ``env_id`` plays one stage (``SuperMarioBros-W-S-vN``) rather than the whole game."""
+    """Tell whether ``env_id`` plays one stage (``SuperMarioBros-W-S-vN``), not the whole game."""
     return re.fullmatch(r"SuperMarioBros-\d-\d-v\d+", env_id) is not None
 
 
@@ -239,13 +240,13 @@ class GameProgress:
     """
 
     def __init__(self):
-        self.levels: List[Tuple[Any, Any]] = []
+        self.levels: list[tuple[Any, Any]] = []
         self.lives_lost = 0
-        self.clean_levels: Optional[int] = None
+        self.clean_levels: int | None = None
         self._life = None
         self._ended_on_flag = False
 
-    def update(self, info: Dict[str, Any], done: bool) -> None:
+    def update(self, info: dict[str, Any], done: bool) -> None:
         """Account for one step.
 
         Args:
@@ -373,7 +374,7 @@ def level_key(world: Any, stage: Any) -> str:
     return f"{world}-{stage}"
 
 
-def route_level(route: Dict[str, Any]) -> str:
+def route_level(route: dict[str, Any]) -> str:
     """Return the 'W-S' label of the level a demonstration route was recorded on."""
     match = re.fullmatch(r"SuperMarioBros-(\d)-(\d)-v\d+", route["env_id"])
     if not match:
@@ -401,8 +402,8 @@ def demo_warmup_frames(frame_stack: int) -> int:
 
 
 def replay_demo_route(
-    nes, route: Dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
-) -> Dict[int, Tuple[Any, List[int], int]]:
+    nes, route: dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
+) -> dict[int, tuple[Any, list[int], int]]:
     """Replay a demonstration route and collect the states a reverse curriculum can start from.
 
     Args:
@@ -439,15 +440,16 @@ def replay_demo_route(
         if frame in expected and x_pos != expected[frame]:
             warnings.warn(
                 f"demo route {route['env_id']} diverged at frame {frame} "
-                f"(x={x_pos}, expected {expected[frame]}); ignoring it"
+                f"(x={x_pos}, expected {expected[frame]}); ignoring it",
+                stacklevel=2,
             )
             return {}
     return states
 
 
 def demo_start_frames(
-    route: Dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
-) -> List[int]:
+    route: dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
+) -> list[int]:
     """Return the route frames a reverse curriculum can start from, earliest first.
 
     Args:
@@ -499,11 +501,11 @@ class ReverseCurriculum:
 
     def __init__(
         self,
-        routes: Sequence[Dict[str, Any]],
+        routes: Sequence[dict[str, Any]],
         warmup_frames: int,
         threshold: float = 0.5,
         window: int = 10,
-        start_frames: Optional[Dict[str, int]] = None,
+        start_frames: dict[str, int] | None = None,
     ):
         self.window = window
         self.required = max(1, int(np.ceil(threshold * window)))
@@ -520,14 +522,14 @@ class ReverseCurriculum:
             self._index[level] = sum(f <= frame for f in self._frames[level]) - 1
         self._outcomes = {level: deque(maxlen=window) for level in self._frames}
 
-    def cursors(self) -> Dict[str, Optional[int]]:
+    def cursors(self) -> dict[str, int | None]:
         """Return each level's current start frame, or None once its curriculum is done."""
         return {
             level: self._frames[level][index] if index >= 0 else None
             for level, index in self._index.items()
         }
 
-    def record(self, outcome: Dict[str, Any]) -> Optional[Tuple[int, int]]:
+    def record(self, outcome: dict[str, Any]) -> tuple[int, int] | None:
         """Count a finished demo episode and step the start back if it has been mastered.
 
         Episodes that started from a later (rehearsal) state, or from a start
@@ -589,7 +591,7 @@ class FrontierStart(Wrapper):
         bucket: int = 32,
         window: int = 20,
         min_episodes: int = 5,
-        demo_routes: Optional[Sequence[Dict[str, Any]]] = None,
+        demo_routes: Sequence[dict[str, Any]] | None = None,
         demo_exact: float = 0.75,
         warmup_frames: int = 0,
     ):
@@ -602,19 +604,19 @@ class FrontierStart(Wrapper):
         self.demo_exact = demo_exact
         self.warmup_frames = warmup_frames
         self._window = window
-        self._snapshots: Dict[Tuple[Any, Any], Dict[int, Any]] = {}
-        self._episode_ends: Dict[Tuple[Any, Any], deque] = {}
+        self._snapshots: dict[tuple[Any, Any], dict[int, Any]] = {}
+        self._episode_ends: dict[tuple[Any, Any], deque] = {}
         self._rng = np.random.default_rng()
         self._level = None
         self._episode_max_x = 0
         self._episode_steps = 0
         self._demo_routes = {route_level(route): route for route in demo_routes or []}
-        self._demo_states: Dict[str, Dict[int, Tuple[Any, List[int], int]]] = {}
-        self._demo_cursor: Dict[str, Optional[int]] = {}
-        self._episode_demo: Optional[Dict[str, Any]] = None
+        self._demo_states: dict[str, dict[int, tuple[Any, list[int], int]]] = {}
+        self._demo_cursor: dict[str, int | None] = {}
+        self._episode_demo: dict[str, Any] | None = None
         self._forced: deque = deque()
 
-    def set_demo_cursor(self, level: str, frame: Optional[int]) -> None:
+    def set_demo_cursor(self, level: str, frame: int | None) -> None:
         """Set the route frame that demo restarts on ``level`` begin from.
 
         Args:
@@ -623,7 +625,7 @@ class FrontierStart(Wrapper):
         """
         self._demo_cursor[level] = frame
 
-    def _demo_states_for(self, level: str) -> Dict[int, Tuple[Any, List[int], int]]:
+    def _demo_states_for(self, level: str) -> dict[int, tuple[Any, list[int], int]]:
         if level not in self._demo_states:
             route = self._demo_routes.get(level)
             self._demo_states[level] = (
@@ -633,14 +635,14 @@ class FrontierStart(Wrapper):
             )
         return self._demo_states[level]
 
-    def frontier(self, level) -> Optional[float]:
-        """Return the median furthest x of recent episodes on ``level``, or None while warming up."""
+    def frontier(self, level) -> float | None:
+        """Return the median furthest x of recent episodes on ``level``, None while warming up."""
         ends = self._episode_ends.get(level)
         if not ends or len(ends) < self.min_episodes:
             return None
         return float(np.median(ends))
 
-    def _pick_demo_frame(self, level: str) -> Optional[int]:
+    def _pick_demo_frame(self, level: str) -> int | None:
         cursor = self._demo_cursor.get(level)
         if cursor is None:
             return None
@@ -678,7 +680,11 @@ class FrontierStart(Wrapper):
         return candidates[int(self._rng.integers(len(candidates)))]
 
     def _restore(self, state, byte: int):
-        """Load ``state`` and play one frame with ``byte``; return (obs, info) or None if that ended the episode."""
+        """Load ``state`` and play one frame with ``byte``.
+
+        Returns:
+            (obs, info), or None when that frame ended the episode.
+        """
         nes = self.env.unwrapped
         nes.load_state(state)
         # gym-super-mario-bros keeps reward trackers (last time, max x,
@@ -693,7 +699,7 @@ class FrontierStart(Wrapper):
             return None
         return obs, info
 
-    def _finish_episode(self) -> Optional[Dict[str, Any]]:
+    def _finish_episode(self) -> dict[str, Any] | None:
         """Book the episode that just ended; return its demo outcome, if it was a demo episode."""
         # Skip resets with no steps since the last one (the construction-time
         # seeding reset, a VecEnv's first reset): they'd record the start x as
@@ -925,7 +931,7 @@ def create_mario_env(
     return_base_env=False,
     max_steps=2000,
     use_custom_reward=True,
-    render_mode: Optional[str] = None,
+    render_mode: str | None = None,
     noop_max: int = 30,
     stall_steps: int = 150,
     frontier_prob: float = 0.0,
@@ -1002,7 +1008,7 @@ def create_vec_env(
     seed=None,
     use_subproc=True,
     use_custom_reward=True,
-    render_mode: Optional[str] = None,
+    render_mode: str | None = None,
     noop_max: int = 30,
     max_episode_steps: int = 2000,
     stall_steps: int = 150,

@@ -3,14 +3,14 @@ PPO Agent implementation with custom CNN architecture for Super Mario Bros
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
 from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import VecEnv
-import numpy as np
 
 
 class MarioCNN(BaseFeaturesExtractor):
@@ -79,7 +79,7 @@ class MarioCNN(BaseFeaturesExtractor):
         return self.linear(self.cnn(observations))
 
 
-def mario_policy_kwargs(features_dim: int = 512) -> Dict[str, Any]:
+def mario_policy_kwargs(features_dim: int = 512) -> dict[str, Any]:
     """Return the policy_kwargs shared by training and every model loader.
 
     Args:
@@ -98,7 +98,7 @@ def mario_policy_kwargs(features_dim: int = 512) -> Dict[str, Any]:
     )
 
 
-def resolve_model_path(path: Union[str, Path]) -> Path:
+def resolve_model_path(path: str | Path) -> Path:
     """Return an existing checkpoint path, accepting it with or without ``.zip``.
 
     Args:
@@ -120,10 +120,10 @@ def resolve_model_path(path: Union[str, Path]) -> Path:
 
 
 def load_mario_model(
-    path: Union[str, Path],
-    env: Optional[VecEnv] = None,
+    path: str | Path,
+    env: VecEnv | None = None,
     device: str = "auto",
-    custom_objects: Optional[Dict[str, Any]] = None,
+    custom_objects: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> PPO:
     """Load a PPO checkpoint that uses MarioCNN.

@@ -2,14 +2,15 @@
 
 import argparse
 import os
-import sys
 import signal
-import torch
-import numpy as np
+import sys
 from datetime import datetime
 from pathlib import Path
+
+import numpy as np
+import torch
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import EvalCallback, BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
@@ -17,6 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
+from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
+from agents.ppo_agent import load_mario_model, mario_policy_kwargs
 from environments.env_factory import (
     DEFAULT_ENV_ID,
     ReverseCurriculum,
@@ -27,10 +30,7 @@ from environments.env_factory import (
     load_demo_route,
     parse_levels,
 )
-from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
-from agents.ppo_agent import load_mario_model, mario_policy_kwargs
 from utils.logger import setup_logger
-
 
 LEARNING_RATE = 1e-4
 CLIP_RANGE = 0.2
@@ -338,7 +338,8 @@ def main():
     logger.info("Hyperparameters:")
     logger.info(f"  learning_rate={LEARNING_RATE}, n_steps=512, batch_size={args.batch_size}")
     logger.info(
-        f"  n_epochs={args.n_epochs}, gamma=0.9, gae_lambda=1.0, ent_coef=0.01, clip_range={CLIP_RANGE}"
+        f"  n_epochs={args.n_epochs}, gamma=0.9, gae_lambda=1.0, ent_coef=0.01, "
+        f"clip_range={CLIP_RANGE}"
     )
     logger.info(
         f"Evaluation: {args.eval_episodes} episodes every {args.eval_freq:,} steps; "
@@ -355,7 +356,10 @@ def main():
         )
     if args.demo_starts:
         if args.frontier_starts <= 0:
-            parser_error = "--demo-starts needs --frontier-starts > 0; demo states are offered on frontier restarts"
+            parser_error = (
+                "--demo-starts needs --frontier-starts > 0; "
+                "demo states are offered on frontier restarts"
+            )
             logger.error(parser_error)
             raise SystemExit(parser_error)
         routes = [route for route in map(load_demo_route, dict.fromkeys(env_ids)) if route]
@@ -375,7 +379,7 @@ def main():
                     start_frames=start_frames,
                 )
             except ValueError as err:
-                raise SystemExit(f"--demo-start-frames: {err}")
+                raise SystemExit(f"--demo-start-frames: {err}") from err
             logger.info(
                 "Reverse curriculum: "
                 + ", ".join(

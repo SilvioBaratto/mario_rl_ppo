@@ -3,7 +3,8 @@ Behaviour cloning on demonstration routes, mixed into PPO training
 """
 
 import warnings
-from typing import Any, Dict, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import torch
@@ -13,8 +14,8 @@ from environments.env_factory import create_mario_env
 
 
 def build_demo_dataset(
-    routes: Sequence[Dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
-) -> Tuple[np.ndarray, np.ndarray]:
+    routes: Sequence[dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+) -> tuple[np.ndarray, np.ndarray]:
     """Play each route's ``agent_actions`` through the training observation pipeline.
 
     Every route is played once per NOOP offset 0..``max_noop`` (raw frames
@@ -68,7 +69,8 @@ def build_demo_dataset(
                 if failed or max_x < goal_x:
                     warnings.warn(
                         f"{route['env_id']} agent_actions miss the route end after {noop} NOOP "
-                        f"frames (x={max_x}, goal {goal_x}); skipping that offset"
+                        f"frames (x={max_x}, goal {goal_x}); skipping that offset",
+                        stacklevel=2,
                     )
                     continue
                 all_obs.extend(obs)
@@ -81,8 +83,8 @@ def build_demo_dataset(
 
 
 def build_game_demo_dataset(
-    routes: Sequence[Dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
-) -> Tuple[np.ndarray, np.ndarray]:
+    routes: Sequence[dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+) -> tuple[np.ndarray, np.ndarray]:
     """Chain consecutive routes through the whole game and keep the pairs after the first level.
 
     A whole-game run enters 1-2 a few frames further into Mario's drop than
@@ -151,8 +153,9 @@ def build_game_demo_dataset(
                     done = terminated or truncated
                 if not ok or (done and index + 1 < len(routes)):
                     warnings.warn(
-                        f"game chain after {noop} NOOP frames: {route['env_id']} route fails from the "
-                        f"whole-game entry (x={info.get('x_pos')}); stopping that chain"
+                        f"game chain after {noop} NOOP frames: {route['env_id']} route fails from "
+                        f"the whole-game entry (x={info.get('x_pos')}); stopping that chain",
+                        stacklevel=2,
                     )
                     break
                 if index:

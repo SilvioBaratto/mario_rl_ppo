@@ -17,15 +17,17 @@ if not temp_args.record_video and not temp_args.render:
 else:
     os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-import torch
-import numpy as np
 import json
 from datetime import datetime
+
 import imageio
+import numpy as np
+import torch
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
+from agents.ppo_agent import load_mario_model
 from environments.env_factory import (
     DEFAULT_ENV_ID,
     GameProgress,
@@ -34,7 +36,6 @@ from environments.env_factory import (
     is_single_stage,
     parse_levels,
 )
-from agents.ppo_agent import load_mario_model
 
 
 def parse_args():
@@ -198,7 +199,8 @@ def evaluate_agent(
         print(
             f"Episode {episode + 1}: Reward={total_reward:.2f}, "
             f"Length={episode_length}, {completion_status}, "
-            f"Most common action: {most_common_action[0]} ({most_common_action[1]}/{episode_length} times)"
+            f"Most common action: {most_common_action[0]} "
+            f"({most_common_action[1]}/{episode_length} times)"
         )
         print(f"  Action distribution: {dict(sorted(action_counts.items()))}")
         if whole_game:
@@ -231,7 +233,8 @@ def print_results(results):
         print(f"Levels cleared before the first life lost: {clean}")
         for n in range(1, max(clean) + 1):
             print(
-                f"  >= {n} level(s) without losing a life: {sum(c >= n for c in clean)}/{len(clean)}"
+                f"  >= {n} level(s) without losing a life: "
+                f"{sum(c >= n for c in clean)}/{len(clean)}"
             )
     print("=" * 50)
 
@@ -288,7 +291,7 @@ def save_results(results_by_env, save_path):
             "min_reward": float(results["min_reward"]),
             "max_distance": int(results["max_distance"]),
             "episode_rewards": [float(r) for r in results["episode_rewards"]],
-            "episode_lengths": [int(l) for l in results["episode_lengths"]],
+            "episode_lengths": [int(length) for length in results["episode_lengths"]],
             "episode_info": convert_to_native(results["episode_info"]),
         }
 

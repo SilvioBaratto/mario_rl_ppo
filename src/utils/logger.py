@@ -4,8 +4,8 @@ Logging utilities for training and evaluation
 
 import logging
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def setup_logger(log_dir, name="mario_rl"):

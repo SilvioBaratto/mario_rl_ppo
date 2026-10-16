@@ -28,7 +28,7 @@ def test_route_actions_through_the_training_env_match_the_golden(level: str, off
 
 @pytest.mark.parametrize("offset", golden_io.GAME_CI_OFFSETS)
 def test_whole_game_chain_matches_the_golden(offset: int) -> None:
-    """Level transitions, idling through level ends, lives and observations of the chained routes."""
+    """Level transitions, idling through level ends, lives and observations of the chain."""
     golden_io.assert_matches("game_chains", probes.game_chain(offset), str(offset))
 
 

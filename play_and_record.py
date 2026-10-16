@@ -9,13 +9,15 @@ import sys
 # Configure SDL for video recording
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-import torch
-import numpy as np
-import imageio
 from datetime import datetime
+
+import imageio
+import numpy as np
+import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
+from agents.ppo_agent import load_mario_model
 from environments.env_factory import (
     DEFAULT_ENV_ID,
     GameProgress,
@@ -23,7 +25,6 @@ from environments.env_factory import (
     episode_end_reason,
     parse_levels,
 )
-from agents.ppo_agent import load_mario_model
 
 
 def parse_args():

@@ -7,7 +7,7 @@ import pytest
 from tests import adapter as a
 from tests.doubles import FakeNes, route
 
-# 40 frames of one pixel each from x=40 reach x=80; the 4 frames before a start are replayed as warm-up.
+# 40 frames of one pixel each from x=40 reach x=80; the 4 frames before a start replay as warm-up.
 FRAMES = [1] * 40
 GOAL_X = 80
 
@@ -47,7 +47,7 @@ def test_frontier_start_without_a_cursor_starts_normally() -> None:
 
 
 def test_demo_restart_restores_the_state_and_forces_the_warmup_bytes() -> None:
-    """The first decision after a restore sees a full stack of real frames, so the route plays on."""
+    """The first decision after a restore sees a full stack of real frames."""
     nes, env = _frontier()
     env.set_demo_cursor("1-1", 24)
     _, info = env.reset(seed=0)

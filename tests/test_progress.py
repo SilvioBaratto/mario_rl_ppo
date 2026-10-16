@@ -59,5 +59,6 @@ def test_progress_summary_names_the_level_reached() -> None:
     progress.update(level_info(1, 1, life=2), False)
     progress.update(level_info(1, 1, life=1), False)
     assert progress.summary() == (
-        "reached 1-1, cleared 0 level(s), 1 life lost, 0 level(s) cleared before the first life lost"
+        "reached 1-1, cleared 0 level(s), 1 life lost, "
+        "0 level(s) cleared before the first life lost"
     )

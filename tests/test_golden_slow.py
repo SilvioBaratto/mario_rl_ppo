@@ -38,7 +38,7 @@ def test_vec_env_rollout_matches_the_golden_in_process() -> None:
 @pytest.mark.integration
 @pytest.mark.emulator
 def test_worker_processes_return_exactly_what_the_in_process_envs_do() -> None:
-    """SubprocVecEnv under forkserver re-imports the entry module; the result must not depend on it."""
+    """SubprocVecEnv under forkserver re-imports the entry module; results must not depend on it."""
     in_process = probes.vec_rollout(use_subproc=False)
     subproc = probes.vec_rollout(use_subproc=True)
     assert probes.same_rollout(in_process, subproc)

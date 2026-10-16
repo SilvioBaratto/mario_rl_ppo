@@ -13,8 +13,8 @@ import warnings
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-import numpy as np
 import gym_super_mario_bros
+import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
@@ -259,11 +259,12 @@ def build_route(env_id, actions, ok_offsets, max_noop, searches):
     return {
         "env_id": env_id,
         "description": (
-            f"Found by find_route.py: Go-Explore style emulator search (archive of states per {CELL_PX}x{CELL_PX} "
-            f"px cell, random sticky actions, shortest path kept per cell, shortest flag route within the budget) "
-            f"from a fresh reset with no NOOPs; the most offset-robust flag route of {searches} searches. "
-            f"frames is agent_actions expanded to {FRAME_SKIP} joypad bytes per step, cut at the flag frame. "
-            f"agent_actions reaches the flag after {len(ok_offsets)} of the {max_noop + 1} NOOP offsets 0-{max_noop}"
+            f"Found by find_route.py: Go-Explore style emulator search (archive of states per "
+            f"{CELL_PX}x{CELL_PX} px cell, random sticky actions, shortest path kept per cell, "
+            f"shortest flag route within the budget) from a fresh reset with no NOOPs; the most "
+            f"offset-robust flag route of {searches} searches. frames is agent_actions expanded "
+            f"to {FRAME_SKIP} joypad bytes per step, cut at the flag frame. agent_actions reaches "
+            f"the flag after {len(ok_offsets)} of the {max_noop + 1} NOOP offsets 0-{max_noop}"
             + (f" (not {', '.join(map(str, failing))})." if failing else ".")
         ),
         "frames": frames,

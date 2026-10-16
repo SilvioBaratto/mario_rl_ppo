@@ -24,7 +24,7 @@ def test_route_is_recorded_on_the_level_it_is_named_after(level_route) -> None:
     """The file name and the env id inside it must agree."""
     level, route = level_route
     assert a.route_level(route) == level
-    assert (a.DEMO_ROUTES_DIR / f"{level}.json").is_file()
+    assert (a.ROUTES_DIR / f"{level}.json").is_file()
 
 
 def test_route_frames_are_the_agent_actions_expanded_to_joypad_bytes(level_route) -> None:

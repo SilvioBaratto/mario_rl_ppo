@@ -12,6 +12,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import evaluate as _evaluate
+import find_route as _find_route
+import play_and_record as _play_and_record
 import train as _train
 from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
 from agents.ppo_agent import MarioCNN, load_mario_model, mario_policy_kwargs, resolve_model_path
@@ -48,11 +51,8 @@ from environments.env_factory import (
 )
 from utils.logger import setup_logger
 
-import evaluate as _evaluate
-import find_route as _find_route
-import play_and_record as _play_and_record
-
 ROOT = Path(__file__).resolve().parents[1]
+ROUTES_DIR = DEMO_ROUTES_DIR
 
 # Trained on this stack (see the run's system_info.txt); untracked, so tests that need it skip.
 CHECKPOINT = ROOT / "runs" / "world1_game3" / "checkpoints" / "checkpoint_17894136.zip"
