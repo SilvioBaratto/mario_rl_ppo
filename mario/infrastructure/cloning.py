@@ -2,6 +2,8 @@
 Behaviour cloning on demonstration routes, mixed into PPO training
 """
 
+from __future__ import annotations
+
 import warnings
 from collections.abc import Sequence
 from typing import Any
@@ -10,7 +12,7 @@ import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
-from mario.environments.env_factory import create_mario_env
+from mario.infrastructure.factory import create_mario_env
 
 
 def build_demo_dataset(

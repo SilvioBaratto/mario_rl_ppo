@@ -15,23 +15,19 @@ from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-from mario.agents.demo_cloning import (
+from mario.domain.config import DEFAULT_ENV_ID
+from mario.domain.curriculum import ReverseCurriculum
+from mario.domain.levels import assign_levels, parse_levels
+from mario.domain.routes import demo_warmup_frames
+from mario.infrastructure.cloning import (
     DemoCloningCallback,
     build_demo_dataset,
     build_game_demo_dataset,
 )
-from mario.agents.ppo_agent import load_mario_model, mario_policy_kwargs
-from mario.environments.env_factory import (
-    DEFAULT_ENV_ID,
-    ReverseCurriculum,
-    assign_levels,
-    create_eval_env,
-    create_vec_env,
-    demo_warmup_frames,
-    load_demo_route,
-    parse_levels,
-)
-from mario.utils.logger import setup_logger
+from mario.infrastructure.factory import create_eval_env, create_vec_env
+from mario.infrastructure.model import load_mario_model, mario_policy_kwargs
+from mario.infrastructure.route_files import load_demo_route
+from mario.infrastructure.run_logger import setup_logger
 
 LEARNING_RATE = 1e-4
 CLIP_RANGE = 0.2

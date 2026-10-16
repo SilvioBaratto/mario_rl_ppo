@@ -2,6 +2,8 @@
 PPO Agent implementation with custom CNN architecture for Super Mario Bros
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 

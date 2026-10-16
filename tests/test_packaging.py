@@ -70,4 +70,4 @@ def test_built_wheel_contains_the_demonstration_routes(tmp_path: Path) -> None:
     (wheel,) = tmp_path.glob("mario_rl_ppo-*.whl")
     names = set(zipfile.ZipFile(wheel).namelist())
     for level in ("1-1", "1-2", "1-3", "1-4"):
-        assert f"mario/environments/demo_routes/{level}.json" in names
+        assert f"mario/infrastructure/demo_routes/{level}.json" in names

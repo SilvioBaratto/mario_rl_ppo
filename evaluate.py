@@ -24,15 +24,11 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from mario.agents.ppo_agent import load_mario_model
-from mario.environments.env_factory import (
-    DEFAULT_ENV_ID,
-    GameProgress,
-    create_vec_env,
-    episode_end_reason,
-    is_single_stage,
-    parse_levels,
-)
+from mario.domain.config import DEFAULT_ENV_ID
+from mario.domain.levels import is_single_stage, parse_levels
+from mario.domain.progress import GameProgress, episode_end_reason
+from mario.infrastructure.factory import create_vec_env
+from mario.infrastructure.model import load_mario_model
 
 
 def parse_args():

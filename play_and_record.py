@@ -14,14 +14,11 @@ import imageio
 import numpy as np
 import torch
 
-from mario.agents.ppo_agent import load_mario_model
-from mario.environments.env_factory import (
-    DEFAULT_ENV_ID,
-    GameProgress,
-    create_vec_env,
-    episode_end_reason,
-    parse_levels,
-)
+from mario.domain.config import DEFAULT_ENV_ID
+from mario.domain.levels import parse_levels
+from mario.domain.progress import GameProgress, episode_end_reason
+from mario.infrastructure.factory import create_vec_env
+from mario.infrastructure.model import load_mario_model
 
 
 def parse_args():

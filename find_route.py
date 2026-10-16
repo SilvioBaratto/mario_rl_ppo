@@ -17,12 +17,9 @@ import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
-from mario.environments.env_factory import (
-    DEMO_ROUTES_DIR,
-    FRAME_SKIP,
-    SMB1_FLOAT_STATE,
-    parse_levels,
-)
+from mario.domain.config import FRAME_SKIP, SMB1_FLOAT_STATE
+from mario.domain.levels import parse_levels
+from mario.infrastructure.route_files import DEMO_ROUTES_DIR
 
 # SMB1 RAM: area type (0 water, 1 ground, 2 underground, 3 castle) and the
 # pointer of the area being played; together they identify an area of a level.

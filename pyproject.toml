@@ -56,7 +56,7 @@ dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "pyright>=1.1"]
 include = ["mario*"]
 
 [tool.setuptools.package-data]
-mario = ["environments/demo_routes/*.json"]
+mario = ["infrastructure/demo_routes/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -80,12 +80,12 @@ ignore = [
 ]
 
 # Every saved checkpoint pickles MarioCNN under the import path agents.ppo_agent, which no longer
-# exists. They load only because load_mario_model replaces the saved policy_kwargs.
+# exists (and the class has moved again since). They load only because load_mario_model replaces the saved policy_kwargs.
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"stable_baselines3.PPO.load".msg = "Use mario.agents.ppo_agent.load_mario_model; a plain PPO.load fails on every checkpoint saved before the package move."
+"stable_baselines3.PPO.load".msg = "Use mario.infrastructure.model.load_mario_model; a plain PPO.load fails on every checkpoint saved before the package move."
 
 [tool.ruff.lint.per-file-ignores]
-"mario/agents/ppo_agent.py" = ["TID251"]
+"mario/infrastructure/model.py" = ["TID251"]
 # The entry scripts set SDL_VIDEODRIVER/SDL_AUDIODRIVER before the imports that would
 # initialise pygame or load the emulator.
 "train.py" = ["E402"]

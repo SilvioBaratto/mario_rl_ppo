@@ -1,6 +1,6 @@
-"""
-Logging utilities for training and evaluation
-"""
+"""Run logging: DEBUG to a timestamped file under the run directory, INFO to stdout."""
+
+from __future__ import annotations
 
 import logging
 import sys

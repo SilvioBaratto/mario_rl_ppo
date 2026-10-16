@@ -109,7 +109,7 @@ jobs:
       # `*.json` in .dockerignore must not strip the demonstration routes.
       - name: Demo routes are in the image
         run: |
-          docker run --rm mario-rl-ppo python -c "from mario.environments.env_factory import load_demo_route; \
+          docker run --rm mario-rl-ppo python -c "from mario.infrastructure.route_files import load_demo_route; \
           assert all(load_demo_route(f'SuperMarioBros-1-{s}-v0') for s in (1, 2, 3, 4))"
 
       # evaluate and record write into the working directory as the non-root user.

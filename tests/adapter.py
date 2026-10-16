@@ -16,49 +16,39 @@ import evaluate as _evaluate
 import find_route as _find_route
 import play_and_record as _play_and_record
 import train as _train
-from mario.agents.demo_cloning import (
+from mario.domain.config import DEFAULT_ENV_ID, DEMO_STRIDE, FRAME_SKIP, HUD_ROWS, SMB1_FLOAT_STATE
+from mario.domain.curriculum import ReverseCurriculum
+from mario.domain.levels import assign_levels, is_single_stage, level_key, parse_levels
+from mario.domain.progress import GameProgress, episode_end_reason
+from mario.domain.routes import demo_start_frames, demo_warmup_frames, route_level
+from mario.infrastructure.cloning import (
     DemoCloningCallback,
     build_demo_dataset,
     build_game_demo_dataset,
 )
-from mario.agents.ppo_agent import (
+from mario.infrastructure.factory import (
+    LevelStartFrameStack,
+    create_eval_env,
+    create_mario_env,
+    create_vec_env,
+)
+from mario.infrastructure.frontier import FrontierStart, replay_demo_route
+from mario.infrastructure.model import (
     MarioCNN,
     load_mario_model,
     mario_policy_kwargs,
     resolve_model_path,
 )
-from mario.environments.env_factory import (
-    DEFAULT_ENV_ID,
-    DEMO_ROUTES_DIR,
-    DEMO_STRIDE,
-    FRAME_SKIP,
-    HUD_ROWS,
+from mario.infrastructure.route_files import DEMO_ROUTES_DIR, load_demo_route
+from mario.infrastructure.run_logger import setup_logger
+from mario.infrastructure.wrappers import (
     NOOP_ACTION,
-    SMB1_FLOAT_STATE,
     CustomReward,
-    FrontierStart,
-    GameProgress,
     GrayResizeObservation,
-    LevelStartFrameStack,
     NoopReset,
-    ReverseCurriculum,
     SkipFrame,
     StallTruncation,
-    assign_levels,
-    create_eval_env,
-    create_mario_env,
-    create_vec_env,
-    demo_start_frames,
-    demo_warmup_frames,
-    episode_end_reason,
-    is_single_stage,
-    level_key,
-    load_demo_route,
-    parse_levels,
-    replay_demo_route,
-    route_level,
 )
-from mario.utils.logger import setup_logger
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUTES_DIR = DEMO_ROUTES_DIR
