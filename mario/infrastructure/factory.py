@@ -17,7 +17,15 @@ from stable_baselines3.common.vec_env import (
     VecTransposeImage,
 )
 
-from mario.domain.config import DEFAULT_ENV_ID, FRAME_SKIP
+from mario.domain.config import (
+    DEFAULT_ENV_ID,
+    FRAME_SKIP,
+    FRAME_STACK,
+    MAX_EPISODE_STEPS,
+    NOOP_MAX,
+    OBS_SIZE,
+    STALL_STEPS,
+)
 from mario.domain.levels import EnvIds, assign_levels
 from mario.domain.routes import demo_warmup_frames
 from mario.infrastructure.frontier import FrontierStart
@@ -61,11 +69,11 @@ def create_mario_env(
     env_id=DEFAULT_ENV_ID,
     seed=None,
     return_base_env=False,
-    max_steps=2000,
+    max_steps=MAX_EPISODE_STEPS,
     use_custom_reward=True,
     render_mode: str | None = None,
-    noop_max: int = 30,
-    stall_steps: int = 150,
+    noop_max: int = NOOP_MAX,
+    stall_steps: int = STALL_STEPS,
     frontier_prob: float = 0.0,
     demo_starts: bool = False,
     demo_warmup: int = 0,
@@ -123,7 +131,7 @@ def create_mario_env(
     if stall_steps > 0:
         env = StallTruncation(env, max_steps=stall_steps)
     env = TimeLimit(env, max_episode_steps=max_steps)
-    env = GrayResizeObservation(env, size=84)
+    env = GrayResizeObservation(env, size=OBS_SIZE)
 
     if seed is not None:
         env.reset(seed=seed)
@@ -136,14 +144,14 @@ def create_mario_env(
 def create_vec_env(
     num_envs=8,
     env_id: EnvIds = DEFAULT_ENV_ID,
-    frame_stack=4,
+    frame_stack=FRAME_STACK,
     seed=None,
     use_subproc=True,
     use_custom_reward=True,
     render_mode: str | None = None,
-    noop_max: int = 30,
-    max_episode_steps: int = 2000,
-    stall_steps: int = 150,
+    noop_max: int = NOOP_MAX,
+    max_episode_steps: int = MAX_EPISODE_STEPS,
+    stall_steps: int = STALL_STEPS,
     frontier_prob: float = 0.0,
     demo_starts: bool = False,
 ):
@@ -218,11 +226,11 @@ def create_vec_env(
 
 def create_eval_env(
     env_id: EnvIds = DEFAULT_ENV_ID,
-    frame_stack=4,
+    frame_stack=FRAME_STACK,
     seed=None,
     use_custom_reward=True,
-    noop_max: int = 30,
-    stall_steps: int = 150,
+    noop_max: int = NOOP_MAX,
+    stall_steps: int = STALL_STEPS,
 ):
     """Create an evaluation VecEnv laid out like the training env.
 

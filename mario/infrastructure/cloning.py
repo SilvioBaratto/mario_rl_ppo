@@ -12,11 +12,12 @@ import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
+from mario.domain.config import FRAME_STACK, NOOP_MAX, OBS_SIZE
 from mario.infrastructure.factory import create_mario_env
 
 
 def build_demo_dataset(
-    routes: Sequence[dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+    routes: Sequence[dict[str, Any]], frame_stack: int = FRAME_STACK, max_noop: int = NOOP_MAX
 ) -> tuple[np.ndarray, np.ndarray]:
     """Play each route's ``agent_actions`` through the training observation pipeline.
 
@@ -80,12 +81,14 @@ def build_demo_dataset(
         finally:
             env.close()
     if not all_obs:
-        return np.zeros((0, frame_stack, 84, 84), dtype=np.uint8), np.zeros(0, dtype=np.int64)
+        return np.zeros((0, frame_stack, OBS_SIZE, OBS_SIZE), dtype=np.uint8), np.zeros(
+            0, dtype=np.int64
+        )
     return np.stack(all_obs), np.asarray(all_actions, dtype=np.int64)
 
 
 def build_game_demo_dataset(
-    routes: Sequence[dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+    routes: Sequence[dict[str, Any]], frame_stack: int = FRAME_STACK, max_noop: int = NOOP_MAX
 ) -> tuple[np.ndarray, np.ndarray]:
     """Chain consecutive routes through the whole game and keep the pairs after the first level.
 
@@ -168,7 +171,9 @@ def build_game_demo_dataset(
     finally:
         env.close()
     if not all_obs:
-        return np.zeros((0, frame_stack, 84, 84), dtype=np.uint8), np.zeros(0, dtype=np.int64)
+        return np.zeros((0, frame_stack, OBS_SIZE, OBS_SIZE), dtype=np.uint8), np.zeros(
+            0, dtype=np.int64
+        )
     return np.stack(all_obs), np.asarray(all_actions, dtype=np.int64)
 
 

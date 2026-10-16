@@ -11,7 +11,7 @@ from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from gymnasium import spaces
 from gymnasium.core import ObservationWrapper, Wrapper
 
-from mario.domain.config import HUD_ROWS
+from mario.domain.config import FRAME_SKIP, HUD_ROWS, NOOP_MAX, OBS_SIZE, STALL_STEPS
 
 StepReturn = tuple[np.ndarray, float, bool, bool, dict[str, Any]]
 
@@ -39,7 +39,7 @@ class SkipFrame(Wrapper):
     frame history.
     """
 
-    def __init__(self, env: gym.Env, skip: int = 4):
+    def __init__(self, env: gym.Env, skip: int = FRAME_SKIP):
         super().__init__(env)
         self._skip = skip
         self._level = None
@@ -81,7 +81,7 @@ class StallTruncation(Wrapper):
     PPO bootstrapping the value of the cut-off state.
     """
 
-    def __init__(self, env: gym.Env, max_steps: int = 150):
+    def __init__(self, env: gym.Env, max_steps: int = STALL_STEPS):
         super().__init__(env)
         self.max_steps = max_steps
         self._segment = None
@@ -132,7 +132,7 @@ class NoopReset(Wrapper):
     trajectory, which makes multi-episode evaluation meaningless.
     """
 
-    def __init__(self, env: gym.Env, noop_max: int = 30):
+    def __init__(self, env: gym.Env, noop_max: int = NOOP_MAX):
         super().__init__(env)
         self.noop_max = noop_max
         self._rng = np.random.default_rng()
@@ -170,7 +170,7 @@ class GrayResizeObservation(ObservationWrapper):
     earlier levels never occur on the single-stage levels they train on.
     """
 
-    def __init__(self, env: gym.Env, size: int = 84):
+    def __init__(self, env: gym.Env, size: int = OBS_SIZE):
         super().__init__(env)
         self._size = size
         self.observation_space = spaces.Box(low=0, high=255, shape=(size, size, 1), dtype=np.uint8)

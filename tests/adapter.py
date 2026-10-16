@@ -12,9 +12,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from mario.cli import train as _train
 from mario.cli.app import build_parser
-from mario.domain.config import DEFAULT_ENV_ID, DEMO_STRIDE, FRAME_SKIP, HUD_ROWS, SMB1_FLOAT_STATE
+from mario.domain.config import (
+    CLIP_RANGE,
+    DEFAULT_ENV_ID,
+    DEMO_STRIDE,
+    FRAME_SKIP,
+    HUD_ROWS,
+    LEARNING_RATE,
+    SMB1_FLOAT_STATE,
+)
 from mario.domain.curriculum import ReverseCurriculum
 from mario.domain.levels import assign_levels, is_single_stage, level_key, parse_levels
 from mario.domain.progress import GameProgress, episode_end_reason
@@ -90,12 +97,12 @@ SYMBOLS: dict[str, Any] = {
 }
 
 CONSTANTS: dict[str, Any] = {
-    "CLIP_RANGE": _train.CLIP_RANGE,
+    "CLIP_RANGE": CLIP_RANGE,
     "DEFAULT_ENV_ID": DEFAULT_ENV_ID,
     "DEMO_STRIDE": DEMO_STRIDE,
     "FRAME_SKIP": FRAME_SKIP,
     "HUD_ROWS": HUD_ROWS,
-    "LEARNING_RATE": _train.LEARNING_RATE,
+    "LEARNING_RATE": LEARNING_RATE,
     "NOOP_ACTION": NOOP_ACTION,
     "SMB1_FLOAT_STATE": SMB1_FLOAT_STATE,
 }

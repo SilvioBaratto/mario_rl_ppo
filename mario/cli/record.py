@@ -6,7 +6,14 @@ import argparse
 from datetime import datetime
 
 from mario.cli.common import configure_sdl, select_device
-from mario.domain.config import DEFAULT_ENV_ID
+from mario.domain.config import (
+    DEFAULT_ENV_ID,
+    FRAME_STACK,
+    NOOP_MAX,
+    RECORD_MAX_STEPS,
+    SEED,
+    STALL_STEPS,
+)
 
 DESCRIPTION = "Play one game with trained model and record video"
 
@@ -20,20 +27,23 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--output", type=str, default=None, help="Output video path (default: auto-generated)"
     )
     parser.add_argument("--env-id", type=str, default=DEFAULT_ENV_ID, help="Environment ID")
-    parser.add_argument("--frame-stack", type=int, default=4, help="Frame stack")
+    parser.add_argument("--frame-stack", type=int, default=FRAME_STACK, help="Frame stack")
     parser.add_argument(
-        "--max-steps", type=int, default=5000, help="Maximum agent steps in the episode"
+        "--max-steps", type=int, default=RECORD_MAX_STEPS, help="Maximum agent steps in the episode"
     )
     parser.add_argument(
-        "--noop-max", type=int, default=30, help="Max random NOOP frames before the episode starts"
+        "--noop-max",
+        type=int,
+        default=NOOP_MAX,
+        help="Max random NOOP frames before the episode starts",
     )
     parser.add_argument(
         "--stall-steps",
         type=int,
-        default=150,
+        default=STALL_STEPS,
         help="Stop after this many steps without a new furthest x (0 disables)",
     )
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--seed", type=int, default=SEED, help="Random seed")
     parser.add_argument(
         "--stochastic",
         action="store_true",

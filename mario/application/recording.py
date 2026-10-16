@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from mario.domain.config import RECORD_MAX_STEPS
 from mario.domain.progress import GameProgress, episode_end_reason
 
 
-def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
+def record_game(agent, env, max_steps=RECORD_MAX_STEPS, deterministic=True, stop_at=None):
     """Play one game and record frames.
 
     Args:

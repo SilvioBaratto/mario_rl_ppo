@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `train.py`, `evaluate.py`, `play_and_record.py`, `find_route.py` and `setup.py` are removed.
 - Demonstration routes are package data under `mario/infrastructure/demo_routes/`; `pyproject.toml`
   replaces `setup.py` and carries the pinned dependencies.
+- The defaults that were retyped in many places (random-start frames 30, stall cutoff 150, frame
+  stack 4, observation size 84, the PPO hyperparameters) are defined once in
+  `mario.domain.config`; the commands and the environment builders read them from there. The
+  values are unchanged.
 - The code is formatted with `ruff format` (line length 100) and passes `ruff check`; type
   annotations use builtin generics and `X | None`.
 

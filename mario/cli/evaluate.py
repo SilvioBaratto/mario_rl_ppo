@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 
 from mario.cli.common import configure_sdl, select_device
-from mario.domain.config import DEFAULT_ENV_ID
+from mario.domain.config import DEFAULT_ENV_ID, FRAME_STACK, NOOP_MAX, SEED, STALL_STEPS
 
 DESCRIPTION = "Evaluate trained Mario PPO agent"
 
@@ -24,7 +24,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--stall-steps",
         type=int,
-        default=150,
+        default=STALL_STEPS,
         help="End an episode after this many steps without a new furthest x (0 disables)",
     )
     parser.add_argument(
@@ -37,11 +37,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--noop-max",
         type=int,
-        default=30,
+        default=NOOP_MAX,
         help="Max random NOOP frames after each reset; 0 makes every "
         "deterministic episode identical",
     )
-    parser.add_argument("--frame-stack", type=int, default=4, help="Frame stack")
+    parser.add_argument("--frame-stack", type=int, default=FRAME_STACK, help="Frame stack")
     parser.add_argument("--n-episodes", type=int, default=10, help="Number of evaluation episodes")
     parser.add_argument(
         "--render", action="store_true", help="Render environment during evaluation"
@@ -57,7 +57,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         help="Use deterministic policy (default: True)",
     )
     parser.add_argument("--stochastic", action="store_true", help="Use stochastic policy")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--seed", type=int, default=SEED, help="Random seed")
     parser.add_argument("--device", type=str, default="auto", help="Device to use")
 
 

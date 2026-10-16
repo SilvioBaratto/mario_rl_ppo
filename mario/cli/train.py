@@ -8,10 +8,21 @@ from datetime import datetime
 from pathlib import Path
 
 from mario.cli.common import configure_sdl, select_device
-from mario.domain.config import DEFAULT_ENV_ID
-
-LEARNING_RATE = 1e-4
-CLIP_RANGE = 0.2
+from mario.domain.config import (
+    CLIP_RANGE,
+    DEFAULT_ENV_ID,
+    ENT_COEF,
+    FRAME_STACK,
+    GAE_LAMBDA,
+    GAMMA,
+    LEARNING_RATE,
+    MAX_GRAD_NORM,
+    N_STEPS,
+    NOOP_MAX,
+    SEED,
+    STALL_STEPS,
+    VF_COEF,
+)
 
 DESCRIPTION = "Train Mario RL Agent with PPO (Simplified)"
 
@@ -30,7 +41,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "workers, which reach later levels the way an evaluation run does",
     )
     parser.add_argument("--num-envs", type=int, default=8)
-    parser.add_argument("--frame-stack", type=int, default=4)
+    parser.add_argument("--frame-stack", type=int, default=FRAME_STACK)
     parser.add_argument(
         "--total-timesteps",
         type=int,
@@ -52,7 +63,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--noop-max",
         type=int,
-        default=30,
+        default=NOOP_MAX,
         help="Max random NOOP frames after each reset (0 disables)",
     )
     parser.add_argument(
@@ -88,12 +99,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--stall-steps",
         type=int,
-        default=150,
+        default=STALL_STEPS,
         help="Truncate an episode after this many agent steps without a new "
         "furthest x (0 disables)",
     )
     parser.add_argument("--exp-name", type=str, default=None)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument(
         "--device", type=str, default="auto", choices=["cpu", "cuda", "mps", "auto"]
     )
@@ -249,9 +260,9 @@ def run(args: argparse.Namespace) -> int:
     logger.info(f"Frame stack: {args.frame_stack}")
     logger.info("Action space: SIMPLE_MOVEMENT (7 actions)")
     logger.info("Hyperparameters:")
-    logger.info(f"  learning_rate={LEARNING_RATE}, n_steps=512, batch_size={args.batch_size}")
+    logger.info(f"  learning_rate={LEARNING_RATE}, n_steps={N_STEPS}, batch_size={args.batch_size}")
     logger.info(
-        f"  n_epochs={args.n_epochs}, gamma=0.9, gae_lambda=1.0, ent_coef=0.01, "
+        f"  n_epochs={args.n_epochs}, gamma={GAMMA}, gae_lambda={GAE_LAMBDA}, ent_coef={ENT_COEF}, "
         f"clip_range={CLIP_RANGE}"
     )
     logger.info(
@@ -400,16 +411,16 @@ def run(args: argparse.Namespace) -> int:
                 "CnnPolicy",
                 env,
                 learning_rate=LEARNING_RATE,
-                n_steps=512,  # Steps per env per update
+                n_steps=N_STEPS,  # Steps per env per update
                 batch_size=args.batch_size,
                 n_epochs=args.n_epochs,
-                gamma=0.9,
-                gae_lambda=1.0,
+                gamma=GAMMA,
+                gae_lambda=GAE_LAMBDA,
                 clip_range=CLIP_RANGE,
                 clip_range_vf=None,
-                ent_coef=0.01,  # Entropy coefficient
-                vf_coef=0.5,  # Value function coefficient
-                max_grad_norm=0.5,  # Gradient clipping
+                ent_coef=ENT_COEF,  # Entropy coefficient
+                vf_coef=VF_COEF,  # Value function coefficient
+                max_grad_norm=MAX_GRAD_NORM,  # Gradient clipping
                 verbose=1,
                 seed=args.seed,
                 policy_kwargs=mario_policy_kwargs(),
