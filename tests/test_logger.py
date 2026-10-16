@@ -21,7 +21,9 @@ def clean_logger():
         handler.close()
 
 
-def test_setup_logger_writes_debug_to_a_file_and_info_to_stdout(tmp_path, capsys, clean_logger) -> None:
+def test_setup_logger_writes_debug_to_a_file_and_info_to_stdout(
+    tmp_path, capsys, clean_logger
+) -> None:
     """The file keeps everything; the console shows INFO and above."""
     logger = a.setup_logger(tmp_path / "logs", name=NAME)
     logger.debug("only in the file")

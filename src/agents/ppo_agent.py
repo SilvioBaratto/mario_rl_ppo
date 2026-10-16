@@ -113,7 +113,7 @@ def resolve_model_path(path: Union[str, Path]) -> Path:
     candidate = Path(path)
     if candidate.is_file():
         return candidate
-    with_zip = candidate.with_name(candidate.name + '.zip')
+    with_zip = candidate.with_name(candidate.name + ".zip")
     if with_zip.is_file():
         return with_zip
     raise FileNotFoundError(f"Checkpoint not found: {path} (also tried {with_zip})")
@@ -122,7 +122,7 @@ def resolve_model_path(path: Union[str, Path]) -> Path:
 def load_mario_model(
     path: Union[str, Path],
     env: Optional[VecEnv] = None,
-    device: str = 'auto',
+    device: str = "auto",
     custom_objects: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
 ) -> PPO:
@@ -147,5 +147,7 @@ def load_mario_model(
     Raises:
         FileNotFoundError: If the checkpoint does not exist.
     """
-    overrides = {'policy_kwargs': mario_policy_kwargs(), **(custom_objects or {})}
-    return PPO.load(resolve_model_path(path), env=env, device=device, custom_objects=overrides, **kwargs)
+    overrides = {"policy_kwargs": mario_policy_kwargs(), **(custom_objects or {})}
+    return PPO.load(
+        resolve_model_path(path), env=env, device=device, custom_objects=overrides, **kwargs
+    )

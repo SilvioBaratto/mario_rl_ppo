@@ -7,46 +7,65 @@ import os
 import sys
 
 # Configure SDL for video recording
-os.environ['SDL_AUDIODRIVER'] = 'dummy'
+os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 import torch
 import numpy as np
 import imageio
 from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from environments.env_factory import DEFAULT_ENV_ID, GameProgress, create_vec_env, episode_end_reason, parse_levels
+from environments.env_factory import (
+    DEFAULT_ENV_ID,
+    GameProgress,
+    create_vec_env,
+    episode_end_reason,
+    parse_levels,
+)
 from agents.ppo_agent import load_mario_model
 
 
 def parse_args():
     """Parse the recording command line."""
-    parser = argparse.ArgumentParser(description='Play one game with trained model and record video')
+    parser = argparse.ArgumentParser(
+        description="Play one game with trained model and record video"
+    )
 
-    parser.add_argument('--model-path', type=str, required=True,
-                       help='Path to trained model (.zip optional)')
-    parser.add_argument('--output', type=str, default=None,
-                       help='Output video path (default: auto-generated)')
-    parser.add_argument('--env-id', type=str, default=DEFAULT_ENV_ID,
-                       help='Environment ID')
-    parser.add_argument('--frame-stack', type=int, default=4,
-                       help='Frame stack')
-    parser.add_argument('--max-steps', type=int, default=5000,
-                       help='Maximum agent steps in the episode')
-    parser.add_argument('--noop-max', type=int, default=30,
-                       help='Max random NOOP frames before the episode starts')
-    parser.add_argument('--stall-steps', type=int, default=150,
-                       help='Stop after this many steps without a new furthest x (0 disables)')
-    parser.add_argument('--seed', type=int, default=42,
-                       help='Random seed')
-    parser.add_argument('--stochastic', action='store_true',
-                       help='Sample actions instead of using the deterministic policy')
-    parser.add_argument('--device', type=str, default='auto',
-                       help='Device to use')
-    parser.add_argument('--stop-at-level', type=str, default=None,
-                       help='With a whole-game env id (SuperMarioBros-v0), end the recording when this '
-                            'level starts, e.g. 2-1 to show 1-1 through 1-4')
+    parser.add_argument(
+        "--model-path", type=str, required=True, help="Path to trained model (.zip optional)"
+    )
+    parser.add_argument(
+        "--output", type=str, default=None, help="Output video path (default: auto-generated)"
+    )
+    parser.add_argument("--env-id", type=str, default=DEFAULT_ENV_ID, help="Environment ID")
+    parser.add_argument("--frame-stack", type=int, default=4, help="Frame stack")
+    parser.add_argument(
+        "--max-steps", type=int, default=5000, help="Maximum agent steps in the episode"
+    )
+    parser.add_argument(
+        "--noop-max", type=int, default=30, help="Max random NOOP frames before the episode starts"
+    )
+    parser.add_argument(
+        "--stall-steps",
+        type=int,
+        default=150,
+        help="Stop after this many steps without a new furthest x (0 disables)",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--stochastic",
+        action="store_true",
+        help="Sample actions instead of using the deterministic policy",
+    )
+    parser.add_argument("--device", type=str, default="auto", help="Device to use")
+    parser.add_argument(
+        "--stop-at-level",
+        type=str,
+        default=None,
+        help="With a whole-game env id (SuperMarioBros-v0), end the recording when this "
+        "level starts, e.g. 2-1 to show 1-1 through 1-4",
+    )
 
     return parser.parse_args()
 
@@ -85,13 +104,13 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
         total_reward += reward
         step_count += 1
         progress.update(info, bool(done))
-        if stop_at is not None and (info.get('world'), info.get('stage')) == stop_at:
+        if stop_at is not None and (info.get("world"), info.get("stage")) == stop_at:
             print(f"Reached {stop_at[0]}-{stop_at[1]}; stopping the recording")
             stopped = True
             break
 
-        if 'x_pos' in info:
-            max_x_pos = max(max_x_pos, info['x_pos'])
+        if "x_pos" in info:
+            max_x_pos = max(max_x_pos, info["x_pos"])
 
         # On done the VecEnv has already reset, so the screen shows the next
         # episode's first frame; skip it. screen is a zero-copy view, so copy it.
@@ -103,7 +122,7 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
             print(f"Step {step_count}: x_pos={max_x_pos}, reward={total_reward:.1f}")
 
     # Game summary
-    flag_get = info.get('flag_get', False)
+    flag_get = info.get("flag_get", False)
     if stopped:
         completion_status = f"Reached {stop_at[0]}-{stop_at[1]} (recording stopped)"
     elif flag_get:
@@ -120,10 +139,10 @@ def record_game(agent, env, max_steps=5000, deterministic=True, stop_at=None):
     print(f"Frames captured: {len(frames)}")
 
     return frames, {
-        'steps': step_count,
-        'reward': total_reward,
-        'max_x_pos': max_x_pos,
-        'flag_get': flag_get
+        "steps": step_count,
+        "reward": total_reward,
+        "max_x_pos": max_x_pos,
+        "flag_get": flag_get,
     }
 
 
@@ -132,13 +151,13 @@ def main():
     args = parse_args()
 
     # Select device
-    if args.device == 'auto':
+    if args.device == "auto":
         if torch.cuda.is_available():
-            device = 'cuda'
+            device = "cuda"
         elif torch.backends.mps.is_available():
-            device = 'mps'
+            device = "mps"
         else:
-            device = 'cpu'
+            device = "cpu"
     else:
         device = args.device
 
@@ -157,7 +176,7 @@ def main():
         seed=args.seed,
         noop_max=args.noop_max,
         max_episode_steps=args.max_steps,
-        stall_steps=args.stall_steps
+        stall_steps=args.stall_steps,
     )
 
     print(f"Loading model from {args.model_path}...")
@@ -177,8 +196,9 @@ def main():
         env=env,
         max_steps=args.max_steps,
         deterministic=not args.stochastic,
-        stop_at=tuple(int(n) for n in parse_levels(args.stop_at_level)[0].split('-')[1:3])
-        if args.stop_at_level else None
+        stop_at=tuple(int(n) for n in parse_levels(args.stop_at_level)[0].split("-")[1:3])
+        if args.stop_at_level
+        else None,
     )
 
     # Save video
@@ -188,12 +208,12 @@ def main():
         else:
             # Auto-generate filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            status = "complete" if game_info['flag_get'] else f"dist_{game_info['max_x_pos']}"
+            status = "complete" if game_info["flag_get"] else f"dist_{game_info['max_x_pos']}"
             video_path = f"mario_gameplay_{timestamp}_{status}.mp4"
 
         print(f"\nSaving video to {video_path}...")
         imageio.mimsave(video_path, frames, fps=30)
-        print(f"Video saved successfully! ({len(frames)} frames, {len(frames)/30:.1f} seconds)")
+        print(f"Video saved successfully! ({len(frames)} frames, {len(frames) / 30:.1f} seconds)")
     else:
         print("Warning: No frames captured, video not saved")
 

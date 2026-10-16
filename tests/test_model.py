@@ -28,9 +28,16 @@ def test_mario_cnn_has_the_layer_names_checkpoints_were_saved_with() -> None:
     """Renaming a layer would make every existing checkpoint fail to load."""
     extractor = a.MarioCNN(spaces.Box(0, 255, (4, 84, 84), np.uint8))
     assert sorted(extractor.state_dict()) == [
-        "cnn.0.bias", "cnn.0.weight", "cnn.2.bias", "cnn.2.weight",
-        "cnn.4.bias", "cnn.4.weight", "cnn.6.bias", "cnn.6.weight",
-        "linear.0.bias", "linear.0.weight",
+        "cnn.0.bias",
+        "cnn.0.weight",
+        "cnn.2.bias",
+        "cnn.2.weight",
+        "cnn.4.bias",
+        "cnn.4.weight",
+        "cnn.6.bias",
+        "cnn.6.weight",
+        "linear.0.bias",
+        "linear.0.weight",
     ]
 
 

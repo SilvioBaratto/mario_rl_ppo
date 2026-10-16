@@ -10,3 +10,21 @@ markers = [
     "integration: spawns SubprocVecEnv workers or runs a CLI as a subprocess",
     "local_golden: needs a checkpoint under runs/ that git does not track",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = [
+    "B905",  # zip() strict= — the paired iterables are equal-length by construction here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The entry scripts set SDL_VIDEODRIVER/SDL_AUDIODRIVER (and put src/ on sys.path) before the
+# imports that would initialise pygame or load the emulator.
+"train.py" = ["E402"]
+"evaluate.py" = ["E402"]
+"play_and_record.py" = ["E402"]
+"find_route.py" = ["E402"]

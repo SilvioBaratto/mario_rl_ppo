@@ -83,15 +83,21 @@ def main(argv: list[str]) -> int:
         second = PRODUCERS[name]()
         elapsed = time.monotonic() - started
         if first["exact"] != second["exact"]:
-            print(f"{name}: NONDETERMINISTIC exact values (A/A mismatch), not written", file=sys.stderr)
+            print(
+                f"{name}: NONDETERMINISTIC exact values (A/A mismatch), not written",
+                file=sys.stderr,
+            )
             return 1
         bound_stable = first["platform_bound"] == second["platform_bound"]
         if not bound_stable:
             print(f"{name}: platform-bound values differ between runs, dropped", file=sys.stderr)
             first["platform_bound"] = {}
         golden_io.save(name, {"platform": probes.platform_tag(), **first})
-        print(f"{name}: written ({elapsed:.0f}s for two runs, platform-bound "
-              f"{'stable' if bound_stable else 'DROPPED'})", file=sys.stderr)
+        print(
+            f"{name}: written ({elapsed:.0f}s for two runs, platform-bound "
+            f"{'stable' if bound_stable else 'DROPPED'})",
+            file=sys.stderr,
+        )
     return 0
 
 

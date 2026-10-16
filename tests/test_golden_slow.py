@@ -14,7 +14,9 @@ from tests import golden_io, probes
 def test_every_noop_offset_matches_the_golden(level: str) -> None:
     """All 31 offsets of one level, through the training env."""
     for offset in golden_io.ALL_OFFSETS:
-        golden_io.assert_matches("trajectories", probes.wrapped_trajectory(level, offset), f"{level}/{offset}")
+        golden_io.assert_matches(
+            "trajectories", probes.wrapped_trajectory(level, offset), f"{level}/{offset}"
+        )
 
 
 @pytest.mark.slow

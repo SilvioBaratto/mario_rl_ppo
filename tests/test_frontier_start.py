@@ -32,7 +32,9 @@ def test_replay_gives_up_with_a_warning_when_a_waypoint_is_missed() -> None:
 
 def _frontier(prob: float = 1.0):
     nes = FakeNes()
-    env = a.FrontierStart(nes, prob=prob, demo_routes=[route(FRAMES, GOAL_X)], demo_exact=1.0, warmup_frames=4)
+    env = a.FrontierStart(
+        nes, prob=prob, demo_routes=[route(FRAMES, GOAL_X)], demo_exact=1.0, warmup_frames=4
+    )
     return nes, env
 
 

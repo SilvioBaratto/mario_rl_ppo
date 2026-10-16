@@ -14,8 +14,13 @@ Row = tuple[float, bool, bool, dict[str, Any]]
 def level_info(world: int = 1, stage: int = 1, **fields: Any) -> dict[str, Any]:
     """Return a gym-super-mario-bros style info dict, overridden by ``fields``."""
     info: dict[str, Any] = {
-        "world": world, "stage": stage, "life": 2, "x_pos": 40, "y_pos": 79,
-        "score": 0, "flag_get": False,
+        "world": world,
+        "stage": stage,
+        "life": 2,
+        "x_pos": 40,
+        "y_pos": 79,
+        "score": 0,
+        "flag_get": False,
     }
     info.update(fields)
     return info

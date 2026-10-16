@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 
-def setup_logger(log_dir, name='mario_rl'):
+def setup_logger(log_dir, name="mario_rl"):
     """Configure a logger that writes DEBUG to a timestamped file and INFO to stdout.
 
     Args:
@@ -26,15 +26,11 @@ def setup_logger(log_dir, name='mario_rl'):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    console_formatter = logging.Formatter(
-        '%(levelname)s - %(message)s'
-    )
+    file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_handler = logging.FileHandler(log_dir / f'training_{timestamp}.log')
+    file_handler = logging.FileHandler(log_dir / f"training_{timestamp}.log")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_formatter)
 

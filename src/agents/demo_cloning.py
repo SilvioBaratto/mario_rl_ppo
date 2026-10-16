@@ -12,8 +12,9 @@ from stable_baselines3.common.callbacks import BaseCallback
 from environments.env_factory import create_mario_env
 
 
-def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
-                       max_noop: int = 30) -> Tuple[np.ndarray, np.ndarray]:
+def build_demo_dataset(
+    routes: Sequence[Dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+) -> Tuple[np.ndarray, np.ndarray]:
     """Play each route's ``agent_actions`` through the training observation pipeline.
 
     Every route is played once per NOOP offset 0..``max_noop`` (raw frames
@@ -36,9 +37,14 @@ def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
     """
     all_obs, all_actions = [], []
     for route in routes:
-        env = create_mario_env(route['env_id'], noop_max=0, stall_steps=0, use_custom_reward=False,
-                               max_steps=len(route['agent_actions']) + 1)
-        goal_x = route['waypoints'][-1]['x']
+        env = create_mario_env(
+            route["env_id"],
+            noop_max=0,
+            stall_steps=0,
+            use_custom_reward=False,
+            max_steps=len(route["agent_actions"]) + 1,
+        )
+        goal_x = route["waypoints"][-1]["x"]
         try:
             for noop in range(max_noop + 1):
                 frame, _ = env.reset()
@@ -50,21 +56,23 @@ def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
                 stack = np.zeros(frame.shape[:2] + (frame_stack,), dtype=np.uint8)
                 stack[..., -1:] = frame
                 obs, max_x, failed = [], 0, False
-                for action in route['agent_actions']:
+                for action in route["agent_actions"]:
                     obs.append(stack.transpose(2, 0, 1).copy())
                     frame, _, terminated, truncated, info = env.step(action)
                     stack = np.roll(stack, -1, axis=-1)
                     stack[..., -1:] = frame
-                    max_x = max(max_x, info['x_pos'])
+                    max_x = max(max_x, info["x_pos"])
                     if terminated or truncated:
-                        failed = not info.get('flag_get')
+                        failed = not info.get("flag_get")
                         break
                 if failed or max_x < goal_x:
-                    warnings.warn(f"{route['env_id']} agent_actions miss the route end after {noop} NOOP "
-                                  f"frames (x={max_x}, goal {goal_x}); skipping that offset")
+                    warnings.warn(
+                        f"{route['env_id']} agent_actions miss the route end after {noop} NOOP "
+                        f"frames (x={max_x}, goal {goal_x}); skipping that offset"
+                    )
                     continue
                 all_obs.extend(obs)
-                all_actions.extend(route['agent_actions'])
+                all_actions.extend(route["agent_actions"])
         finally:
             env.close()
     if not all_obs:
@@ -72,8 +80,9 @@ def build_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
     return np.stack(all_obs), np.asarray(all_actions, dtype=np.int64)
 
 
-def build_game_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int = 4,
-                            max_noop: int = 30) -> Tuple[np.ndarray, np.ndarray]:
+def build_game_demo_dataset(
+    routes: Sequence[Dict[str, Any]], frame_stack: int = 4, max_noop: int = 30
+) -> Tuple[np.ndarray, np.ndarray]:
     """Chain consecutive routes through the whole game and keep the pairs after the first level.
 
     A whole-game run enters 1-2 a few frames further into Mario's drop than
@@ -102,8 +111,13 @@ def build_game_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int =
         one single-stage route in the cloning batches.
     """
     all_obs, all_actions = [], []
-    env = create_mario_env('SuperMarioBros-v0', noop_max=0, stall_steps=0, use_custom_reward=False,
-                           max_steps=sum(len(route['agent_actions']) for route in routes) + 2000)
+    env = create_mario_env(
+        "SuperMarioBros-v0",
+        noop_max=0,
+        stall_steps=0,
+        use_custom_reward=False,
+        max_steps=sum(len(route["agent_actions"]) for route in routes) + 2000,
+    )
     try:
         for noop in range(max_noop + 1):
             frame, info = env.reset()
@@ -114,35 +128,37 @@ def build_game_demo_dataset(routes: Sequence[Dict[str, Any]], frame_stack: int =
                 frame = env.observation(nes.screen)
             stack = np.zeros(frame.shape[:2] + (frame_stack,), dtype=np.uint8)
             stack[..., -1:] = frame
-            life = info['life']
+            life = info["life"]
             for index, route in enumerate(routes):
-                level = (info.get('world'), info.get('stage'))
+                level = (info.get("world"), info.get("stage"))
                 obs, done = [], False
-                for action in route['agent_actions']:
+                for action in route["agent_actions"]:
                     obs.append(stack.transpose(2, 0, 1).copy())
                     frame, _, terminated, truncated, info = env.step(action)
                     stack = np.roll(stack, -1, axis=-1)
                     stack[..., -1:] = frame
-                    done = terminated or truncated or info['life'] < life
+                    done = terminated or truncated or info["life"] < life
                     # The next level can begin inside the agent step that touched
                     # the flag, and then no returned info shows flag_get.
-                    moved_on = (info.get('world'), info.get('stage')) != level
-                    if info.get('flag_get') or moved_on or done:
+                    moved_on = (info.get("world"), info.get("stage")) != level
+                    if info.get("flag_get") or moved_on or done:
                         break
-                ok = (bool(info.get('flag_get')) or moved_on) and not info['life'] < life
-                while ok and not done and (info.get('world'), info.get('stage')) == level:
+                ok = (bool(info.get("flag_get")) or moved_on) and not info["life"] < life
+                while ok and not done and (info.get("world"), info.get("stage")) == level:
                     frame, _, terminated, truncated, info = env.step(0)
                     stack = np.roll(stack, -1, axis=-1)
                     stack[..., -1:] = frame
                     done = terminated or truncated
                 if not ok or (done and index + 1 < len(routes)):
-                    warnings.warn(f"game chain after {noop} NOOP frames: {route['env_id']} route fails from the "
-                                  f"whole-game entry (x={info.get('x_pos')}); stopping that chain")
+                    warnings.warn(
+                        f"game chain after {noop} NOOP frames: {route['env_id']} route fails from the "
+                        f"whole-game entry (x={info.get('x_pos')}); stopping that chain"
+                    )
                     break
                 if index:
                     all_obs.extend(obs)
-                    all_actions.extend(route['agent_actions'][:len(obs)])
-                if info.get('level_start'):
+                    all_actions.extend(route["agent_actions"][: len(obs)])
+                if info.get("level_start"):
                     stack[..., :-1] = 0
     finally:
         env.close()
@@ -174,8 +190,15 @@ class DemoCloningCallback(BaseCallback):
         seed: Seed of the minibatch sampler.
     """
 
-    def __init__(self, observations: np.ndarray, actions: np.ndarray, steps: int = 10,
-                 batch_size: int = 256, seed: int = 0, verbose: int = 0):
+    def __init__(
+        self,
+        observations: np.ndarray,
+        actions: np.ndarray,
+        steps: int = 10,
+        batch_size: int = 256,
+        seed: int = 0,
+        verbose: int = 0,
+    ):
         super().__init__(verbose)
         self.steps = steps
         self.batch_size = batch_size
@@ -195,8 +218,9 @@ class DemoCloningCallback(BaseCallback):
         policy.set_training_mode(True)
         losses = []
         for _ in range(self.steps):
-            idx = torch.as_tensor(self._rng.integers(len(self._actions), size=self.batch_size),
-                                  device=policy.device)
+            idx = torch.as_tensor(
+                self._rng.integers(len(self._actions), size=self.batch_size), device=policy.device
+            )
             _, log_prob, _ = policy.evaluate_actions(self._obs_tensor[idx], self._act_tensor[idx])
             loss = -log_prob.mean()
             policy.optimizer.zero_grad()
@@ -209,11 +233,11 @@ class DemoCloningCallback(BaseCallback):
         with torch.no_grad():
             correct = 0
             for start in range(0, len(self._actions), 1024):
-                obs = self._obs_tensor[start:start + 1024]
+                obs = self._obs_tensor[start : start + 1024]
                 greedy = policy.get_distribution(obs).distribution.probs.argmax(dim=1)
-                correct += (greedy == self._act_tensor[start:start + 1024]).sum().item()
-        self.logger.record('demo/bc_loss', float(np.mean(losses)))
-        self.logger.record('demo/bc_accuracy', correct / len(self._actions))
+                correct += (greedy == self._act_tensor[start : start + 1024]).sum().item()
+        self.logger.record("demo/bc_loss", float(np.mean(losses)))
+        self.logger.record("demo/bc_accuracy", correct / len(self._actions))
 
     def _on_step(self) -> bool:
         return True

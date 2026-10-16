@@ -8,7 +8,10 @@ from tests.doubles import level_info
 
 def test_end_reason_prefers_the_stall_cutoff_then_the_time_limit() -> None:
     """Anything that is neither a stall nor a time limit counts as a death."""
-    assert a.episode_end_reason({"stalled": True, "TimeLimit.truncated": True}) == "Stalled (no progress)"
+    assert (
+        a.episode_end_reason({"stalled": True, "TimeLimit.truncated": True})
+        == "Stalled (no progress)"
+    )
     assert a.episode_end_reason({"TimeLimit.truncated": True}) == "Time limit"
     assert a.episode_end_reason({}) == "Died"
 

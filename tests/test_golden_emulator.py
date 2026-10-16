@@ -21,7 +21,9 @@ def test_routes_replay_on_the_bare_emulator_as_recorded() -> None:
 @pytest.mark.parametrize(("level", "offset"), TRAJECTORY_CASES)
 def test_route_actions_through_the_training_env_match_the_golden(level: str, offset: int) -> None:
     """Rewards, infos and observations per agent step, after a NOOP offset."""
-    golden_io.assert_matches("trajectories", probes.wrapped_trajectory(level, offset), f"{level}/{offset}")
+    golden_io.assert_matches(
+        "trajectories", probes.wrapped_trajectory(level, offset), f"{level}/{offset}"
+    )
 
 
 @pytest.mark.parametrize("offset", golden_io.GAME_CI_OFFSETS)

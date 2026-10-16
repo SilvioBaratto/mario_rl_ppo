@@ -10,15 +10,15 @@ import sys
 import time
 import warnings
 
-os.environ['SDL_VIDEODRIVER'] = 'dummy'
-os.environ['SDL_AUDIODRIVER'] = 'dummy'
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+os.environ["SDL_AUDIODRIVER"] = "dummy"
 
 import numpy as np
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from environments.env_factory import DEMO_ROUTES_DIR, FRAME_SKIP, SMB1_FLOAT_STATE, parse_levels
 
@@ -37,19 +37,37 @@ WAYPOINT_EVERY = 240
 
 def parse_args():
     """Parse the route-search command line."""
-    parser = argparse.ArgumentParser(description='Find a demonstration route through a level by emulator search')
-    parser.add_argument('--level', type=str, required=True, help='Level to search, e.g. 1-4')
-    parser.add_argument('--searches', type=int, default=20,
-                       help='Independent searches (seeds); the most NOOP-robust flag route is kept')
-    parser.add_argument('--budget', type=int, default=60_000,
-                       help='Agent steps per search; each spends all of them and returns its shortest flag route')
-    parser.add_argument('--workers', type=int, default=4, help='Searches run in parallel')
-    parser.add_argument('--max-noop', type=int, default=30,
-                       help='Robustness is checked for NOOP offsets 0..this (match --noop-max)')
-    parser.add_argument('--output', type=str, default=None,
-                       help='Route file (default: src/environments/demo_routes/<W>-<S>.json)')
-    parser.add_argument('--force', action='store_true', help='Overwrite an existing route file')
-    parser.add_argument('--seed', type=int, default=0, help='Seed of the first search')
+    parser = argparse.ArgumentParser(
+        description="Find a demonstration route through a level by emulator search"
+    )
+    parser.add_argument("--level", type=str, required=True, help="Level to search, e.g. 1-4")
+    parser.add_argument(
+        "--searches",
+        type=int,
+        default=20,
+        help="Independent searches (seeds); the most NOOP-robust flag route is kept",
+    )
+    parser.add_argument(
+        "--budget",
+        type=int,
+        default=60_000,
+        help="Agent steps per search; each spends all of them and returns its shortest flag route",
+    )
+    parser.add_argument("--workers", type=int, default=4, help="Searches run in parallel")
+    parser.add_argument(
+        "--max-noop",
+        type=int,
+        default=30,
+        help="Robustness is checked for NOOP offsets 0..this (match --noop-max)",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Route file (default: src/environments/demo_routes/<W>-<S>.json)",
+    )
+    parser.add_argument("--force", action="store_true", help="Overwrite an existing route file")
+    parser.add_argument("--seed", type=int, default=0, help="Seed of the first search")
     return parser.parse_args()
 
 
@@ -93,12 +111,12 @@ def go_explore(env_id, budget, seed):
         reports ``flag_get`` (world-over in castles), or None when no flag was
         reached within the budget.
     """
-    warnings.filterwarnings('ignore')
+    warnings.filterwarnings("ignore")
     rng = np.random.default_rng(seed)
     nes, action_map = _make_raw_env(env_id)
     nes.reset()
     info = nes._get_info()
-    level = (info['world'], info['stage'])
+    level = (info["world"], info["stage"])
     # x restarts in every area (e.g. 1-2's outdoor exit after the underground
     # part), so cells and progress are per area; areas found later rank higher.
     area_rank = {}
@@ -109,25 +127,27 @@ def go_explore(env_id, budget, seed):
 
     def progress(info):
         """Return how far along the level ``info`` is: area discovery rank first, then x."""
-        return area_rank.setdefault(area_of(), len(area_rank)) * 100_000 + info['x_pos']
+        return area_rank.setdefault(area_of(), len(area_rank)) * 100_000 + info["x_pos"]
 
     def cell_of(info):
         """Return the archive cell of Mario's position in ``info``."""
-        return area_of() + (info['x_pos'] // CELL_PX, info['y_pos'] // CELL_PX)
+        return area_of() + (info["x_pos"] // CELL_PX, info["y_pos"] // CELL_PX)
 
-    archive = {cell_of(info): {'state': nes.dump_state(), 'actions': [], 'x': progress(info), 'visits': 0}}
+    archive = {
+        cell_of(info): {"state": nes.dump_state(), "actions": [], "x": progress(info), "visits": 0}
+    }
     steps = 0
     best = None
     while steps < budget:
         cells = list(archive)
-        xs = np.array([archive[c]['x'] for c in cells], dtype=float)
-        weights = 1.0 / np.sqrt(np.array([archive[c]['visits'] for c in cells], dtype=float) + 1.0)
+        xs = np.array([archive[c]["x"] for c in cells], dtype=float)
+        weights = 1.0 / np.sqrt(np.array([archive[c]["visits"] for c in cells], dtype=float) + 1.0)
         if rng.random() < 0.5:
             weights = weights * (xs >= np.quantile(xs, 0.9))
         entry = archive[cells[int(rng.choice(len(cells), p=weights / weights.sum()))]]
-        entry['visits'] += 1
-        nes.load_state(entry['state'])
-        actions = list(entry['actions'])
+        entry["visits"] += 1
+        nes.load_state(entry["state"])
+        actions = list(entry["actions"])
         action = int(rng.choice(len(ACTION_WEIGHTS), p=ACTION_WEIGHTS))
         for _ in range(int(rng.integers(8, 48))):
             if rng.random() > STICKY:
@@ -135,17 +155,21 @@ def go_explore(env_id, budget, seed):
             info, done = _agent_step(nes, action_map[action])
             steps += 1
             actions.append(action)
-            if info.get('flag_get'):
+            if info.get("flag_get"):
                 if best is None or len(actions) < len(best):
                     best = list(actions)
                 break
-            if done or (info['world'], info['stage']) != level:
+            if done or (info["world"], info["stage"]) != level:
                 break
             cell = cell_of(info)
             old = archive.get(cell)
-            if old is None or len(actions) < len(old['actions']):
-                archive[cell] = {'state': nes.dump_state(), 'actions': list(actions), 'x': progress(info),
-                                 'visits': old['visits'] if old else 0}
+            if old is None or len(actions) < len(old["actions"]):
+                archive[cell] = {
+                    "state": nes.dump_state(),
+                    "actions": list(actions),
+                    "x": progress(info),
+                    "visits": old["visits"] if old else 0,
+                }
     return best
 
 
@@ -180,7 +204,7 @@ def flag_offsets(env_id, actions, max_noop):
             info, done = _agent_step(nes, action_map[action])
             if done:
                 break
-        if info.get('flag_get'):
+        if info.get("flag_get"):
             ok.append(noop)
     return ok
 
@@ -220,28 +244,31 @@ def build_route(env_id, actions, ok_offsets, max_noop, searches):
                 break
         if terminated or truncated:
             break
-    if not info.get('flag_get'):
-        raise RuntimeError(f"{env_id}: route does not reach the flag on replay (x={info.get('x_pos')})")
+    if not info.get("flag_get"):
+        raise RuntimeError(
+            f"{env_id}: route does not reach the flag on replay (x={info.get('x_pos')})"
+        )
 
     waypoints = []
     for target in range(WAYPOINT_EVERY, len(frames) - WAYPOINT_EVERY // 2, WAYPOINT_EVERY):
         frame = next((f for f in range(target, len(frames)) if grounded[f - 1]), None)
         if frame is not None:
-            waypoints.append({'frame': frame, 'x': xs[frame - 1]})
-    waypoints.append({'frame': len(frames), 'x': xs[-1], 'note': 'flag_get'})
+            waypoints.append({"frame": frame, "x": xs[frame - 1]})
+    waypoints.append({"frame": len(frames), "x": xs[-1], "note": "flag_get"})
     failing = [k for k in range(max_noop + 1) if k not in ok_offsets]
     return {
-        'env_id': env_id,
-        'description': (
+        "env_id": env_id,
+        "description": (
             f"Found by find_route.py: Go-Explore style emulator search (archive of states per {CELL_PX}x{CELL_PX} "
             f"px cell, random sticky actions, shortest path kept per cell, shortest flag route within the budget) "
             f"from a fresh reset with no NOOPs; the most offset-robust flag route of {searches} searches. "
             f"frames is agent_actions expanded to {FRAME_SKIP} joypad bytes per step, cut at the flag frame. "
             f"agent_actions reaches the flag after {len(ok_offsets)} of the {max_noop + 1} NOOP offsets 0-{max_noop}"
-            + (f" (not {', '.join(map(str, failing))})." if failing else ".")),
-        'frames': frames,
-        'waypoints': waypoints,
-        'agent_actions': [int(a) for a in actions],
+            + (f" (not {', '.join(map(str, failing))})." if failing else ".")
+        ),
+        "frames": frames,
+        "waypoints": waypoints,
+        "agent_actions": [int(a) for a in actions],
     }
 
 
@@ -249,14 +276,16 @@ def main():
     """Run the searches, keep the most NOOP-robust flag route and write it."""
     args = parse_args()
     env_id = parse_levels(args.level)[0]
-    world, stage = args.level.strip().split('-')
-    output = args.output or str(DEMO_ROUTES_DIR / f'{world}-{stage}.json')
+    world, stage = args.level.strip().split("-")
+    output = args.output or str(DEMO_ROUTES_DIR / f"{world}-{stage}.json")
     if os.path.exists(output) and not args.force:
-        raise SystemExit(f"{output} exists; pass --force to replace it or --output to write elsewhere")
+        raise SystemExit(
+            f"{output} exists; pass --force to replace it or --output to write elsewhere"
+        )
 
     jobs = [(env_id, args.budget, args.seed + i) for i in range(args.searches)]
     found = []
-    with multiprocessing.get_context('forkserver').Pool(args.workers) as pool:
+    with multiprocessing.get_context("forkserver").Pool(args.workers) as pool:
         for seed, actions, seconds in pool.imap_unordered(_search_worker, jobs):
             status = f"flag in {len(actions)} steps" if actions else "no flag"
             print(f"search seed {seed}: {status} ({seconds:.0f}s)", flush=True)
@@ -267,15 +296,22 @@ def main():
         # Seed order keeps the choice between equally good routes independent of finishing order.
         found.sort()
         print(f"Checking NOOP offsets 0-{args.max_noop} for {len(found)} routes...", flush=True)
-        offsets = pool.starmap(flag_offsets, [(env_id, actions, args.max_noop) for _, actions in found])
-    ranked = sorted(zip(offsets, (actions for _, actions in found)), key=lambda item: (-len(item[0]), len(item[1])))
+        offsets = pool.starmap(
+            flag_offsets, [(env_id, actions, args.max_noop) for _, actions in found]
+        )
+    ranked = sorted(
+        zip(offsets, (actions for _, actions in found)),
+        key=lambda item: (-len(item[0]), len(item[1])),
+    )
     ok_offsets, actions = ranked[0]
     route = build_route(env_id, actions, ok_offsets, args.max_noop, args.searches)
-    with open(output, 'w') as f:
+    with open(output, "w") as f:
         json.dump(route, f, indent=1)
-    print(f"Saved {output}: {len(actions)} agent steps, {len(route['frames'])} frames, "
-          f"flag at x={route['waypoints'][-1]['x']}, reaches the flag after "
-          f"{len(ok_offsets)}/{args.max_noop + 1} NOOP offsets")
+    print(
+        f"Saved {output}: {len(actions)} agent steps, {len(route['frames'])} frames, "
+        f"flag at x={route['waypoints'][-1]['x']}, reaches the flag after "
+        f"{len(ok_offsets)}/{args.max_noop + 1} NOOP offsets"
+    )
 
 
 if __name__ == "__main__":

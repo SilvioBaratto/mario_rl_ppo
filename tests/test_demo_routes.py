@@ -30,7 +30,9 @@ def test_route_is_recorded_on_the_level_it_is_named_after(level_route) -> None:
 def test_route_frames_are_the_agent_actions_expanded_to_joypad_bytes(level_route) -> None:
     """Both forms are the same trajectory: each action holds its buttons for FRAME_SKIP frames."""
     _, route = level_route
-    expanded = [_joypad_byte(action) for action in route["agent_actions"] for _ in range(a.FRAME_SKIP)]
+    expanded = [
+        _joypad_byte(action) for action in route["agent_actions"] for _ in range(a.FRAME_SKIP)
+    ]
     assert route["frames"] == expanded[: len(route["frames"])]
 
 

@@ -27,10 +27,26 @@ import numpy as np
 from tests import adapter as a
 
 INFO_KEYS = (
-    "x_pos", "y_pos", "world", "stage", "life", "score", "coins", "time", "status", "flag_get",
+    "x_pos",
+    "y_pos",
+    "world",
+    "stage",
+    "life",
+    "score",
+    "coins",
+    "time",
+    "status",
+    "flag_get",
 )
 VEC_INFO_KEYS = (
-    "x_pos", "world", "stage", "life", "flag_get", "TimeLimit.truncated", "stalled", "level_start",
+    "x_pos",
+    "world",
+    "stage",
+    "life",
+    "flag_get",
+    "TimeLimit.truncated",
+    "stalled",
+    "level_start",
 )
 MARK_EVERY = 50
 GAME_ID = "SuperMarioBros-v0"
@@ -128,8 +144,10 @@ def api_surface() -> dict[str, Any]:
 def cli_surface() -> dict[str, Any]:
     """Every command's argparse defaults when only its required flags are given."""
     return result(
-        {cmd: {k: repr(v) for k, v in sorted(a.cli_defaults(cmd).items())}
-         for cmd in ("train", "evaluate", "record", "find-route")}
+        {
+            cmd: {k: repr(v) for k, v in sorted(a.cli_defaults(cmd).items())}
+            for cmd in ("train", "evaluate", "record", "find-route")
+        }
     )
 
 
@@ -218,7 +236,8 @@ def pure_tables() -> dict[str, Any]:
             starts[f"{lv}/w{warmup}"] = [frames[0], frames[-1], len(frames)]
     table = {
         "parse_levels": {
-            spec: a.parse_levels(spec) for spec in ("1-1", "1-1,1-2,1-3", "game", " 1-1 , game ", "8-4")
+            spec: a.parse_levels(spec)
+            for spec in ("1-1", "1-1,1-2,1-3", "game", " 1-1 , game ", "8-4")
         },
         "parse_levels_errors": errors,
         "assign_levels": {
@@ -234,7 +253,12 @@ def pure_tables() -> dict[str, Any]:
         },
         "episode_end_reason": [
             a.episode_end_reason(info)
-            for info in ({"stalled": True}, {"TimeLimit.truncated": True}, {}, {"stalled": True, "TimeLimit.truncated": True})
+            for info in (
+                {"stalled": True},
+                {"TimeLimit.truncated": True},
+                {},
+                {"stalled": True, "TimeLimit.truncated": True},
+            )
         ],
         "demo_warmup_frames": {str(n): a.demo_warmup_frames(n) for n in (1, 2, 4, 5)},
         "demo_start_frames": starts,
@@ -268,7 +292,10 @@ def raw_route_replay() -> dict[str, Any]:
             replays = {}
             for warmup in (0, a.demo_warmup_frames(4)):
                 states = a.replay_demo_route(nes, route, warmup_frames=warmup)
-                replays[str(warmup)] = {"frames": sorted(states), "x": [states[f][2] for f in sorted(states)]}
+                replays[str(warmup)] = {
+                    "frames": sorted(states),
+                    "x": [states[f][2] for f in sorted(states)],
+                }
             out[lv] = {"waypoint_x": waypoint_x, "ram_marks": ram_marks, "replays": replays}
             shots[lv] = final_screen
         finally:
@@ -295,7 +322,9 @@ def wrapped_trajectory(level: str, offset: int) -> dict[str, Any]:
             frame, reward, terminated, truncated, info = env.step(action)
             steps += 1
             max_x = max(max_x, int(info["x_pos"]))
-            info_chain.update(json.dumps(_step_row(action, reward, terminated, truncated, info)).encode())
+            info_chain.update(
+                json.dumps(_step_row(action, reward, terminated, truncated, info)).encode()
+            )
             obs_chain.update(frame.tobytes())
             if terminated or truncated:
                 break
@@ -318,7 +347,10 @@ def game_chain(offset: int) -> dict[str, Any]:
     """Chain the four routes through the whole game, idling through each level end."""
     routes = [a.load_demo_route(f"SuperMarioBros-1-{s}-v0") for s in (1, 2, 3, 4)]
     env = a.create_mario_env(
-        GAME_ID, noop_max=0, stall_steps=0, use_custom_reward=False,
+        GAME_ID,
+        noop_max=0,
+        stall_steps=0,
+        use_custom_reward=False,
         max_steps=sum(len(r["agent_actions"]) for r in routes) + 2000,
     )
     try:
@@ -338,7 +370,9 @@ def game_chain(offset: int) -> dict[str, Any]:
             for action in route["agent_actions"]:
                 frame, reward, terminated, truncated, info = env.step(action)
                 taken += 1
-                info_chain.update(json.dumps(_step_row(action, reward, terminated, truncated, info)).encode())
+                info_chain.update(
+                    json.dumps(_step_row(action, reward, terminated, truncated, info)).encode()
+                )
                 obs_chain.update(frame.tobytes())
                 done = terminated or truncated or info["life"] < life
                 moved_on = (info.get("world"), info.get("stage")) != level
@@ -349,19 +383,31 @@ def game_chain(offset: int) -> dict[str, Any]:
             while ok and not done and (info.get("world"), info.get("stage")) == level:
                 frame, reward, terminated, truncated, info = env.step(0)
                 idle += 1
-                info_chain.update(json.dumps(_step_row(0, reward, terminated, truncated, info)).encode())
+                info_chain.update(
+                    json.dumps(_step_row(0, reward, terminated, truncated, info)).encode()
+                )
                 obs_chain.update(frame.tobytes())
                 done = terminated or truncated
-            transcript.append({
-                "route": route["env_id"], "taken": taken, "idle": idle, "ok": ok, "done": done,
-                "world": plain(info.get("world")), "stage": plain(info.get("stage")),
-                "life": plain(info.get("life")), "x_pos": plain(info.get("x_pos")),
-                "level_start": bool(info.get("level_start")),
-            })
+            transcript.append(
+                {
+                    "route": route["env_id"],
+                    "taken": taken,
+                    "idle": idle,
+                    "ok": ok,
+                    "done": done,
+                    "world": plain(info.get("world")),
+                    "stage": plain(info.get("stage")),
+                    "life": plain(info.get("life")),
+                    "x_pos": plain(info.get("x_pos")),
+                    "level_start": bool(info.get("level_start")),
+                }
+            )
             if not ok or (done and index + 1 < len(routes)):
                 break
-        return result({"transcript": transcript, "info_chain": info_chain.final()},
-                      {"obs_chain": obs_chain.final()})
+        return result(
+            {"transcript": transcript, "info_chain": info_chain.final()},
+            {"obs_chain": obs_chain.final()},
+        )
     finally:
         env.close()
 
@@ -380,7 +426,11 @@ def _wrapper_chain(env: Any) -> list[str]:
 def vec_rollout(use_subproc: bool, steps: int = 300) -> dict[str, Any]:
     """Step a mixed-level vec env with scripted actions and hash everything it returns."""
     env = a.create_vec_env(
-        num_envs=len(VEC_LEVELS), env_id=list(VEC_LEVELS), seed=42, noop_max=30, use_subproc=use_subproc
+        num_envs=len(VEC_LEVELS),
+        env_id=list(VEC_LEVELS),
+        seed=42,
+        noop_max=30,
+        use_subproc=use_subproc,
     )
     try:
         actions = np.random.default_rng(0).integers(0, 7, size=(steps, len(VEC_LEVELS)))
@@ -392,9 +442,9 @@ def vec_rollout(use_subproc: bool, steps: int = 300) -> dict[str, Any]:
             obs, rewards, dones, infos = env.step(actions[t])
             obs_chain.update(obs.tobytes())
             reward_chain.update(np.asarray(rewards, dtype=np.float32).tobytes())
-            info_chain.update(json.dumps([
-                [plain(info.get(k)) for k in VEC_INFO_KEYS] for info in infos
-            ]).encode())
+            info_chain.update(
+                json.dumps([[plain(info.get(k)) for k in VEC_INFO_KEYS] for info in infos]).encode()
+            )
             for i, done in enumerate(dones):
                 if done:
                     dones_at.append([t, i])
@@ -441,12 +491,20 @@ def frontier_demo_restarts(steps: int = 200) -> dict[str, Any]:
     r11 = a.load_demo_route("SuperMarioBros-1-1-v0")
     warmup = a.demo_warmup_frames(4)
     env = a.create_vec_env(
-        num_envs=2, env_id=["SuperMarioBros-1-3-v0", "SuperMarioBros-1-1-v0"], seed=42,
-        frontier_prob=0.5, demo_starts=True, use_subproc=False,
+        num_envs=2,
+        env_id=["SuperMarioBros-1-3-v0", "SuperMarioBros-1-1-v0"],
+        seed=42,
+        frontier_prob=0.5,
+        demo_starts=True,
+        use_subproc=False,
     )
     try:
-        env.env_method("set_demo_cursor", "1-3", a.demo_start_frames(r13, a.DEMO_STRIDE, warmup)[10])
-        env.env_method("set_demo_cursor", "1-1", a.demo_start_frames(r11, a.DEMO_STRIDE, warmup)[-1])
+        env.env_method(
+            "set_demo_cursor", "1-3", a.demo_start_frames(r13, a.DEMO_STRIDE, warmup)[10]
+        )
+        env.env_method(
+            "set_demo_cursor", "1-1", a.demo_start_frames(r11, a.DEMO_STRIDE, warmup)[-1]
+        )
         base = env
         while hasattr(base, "venv"):
             base = base.venv
@@ -460,10 +518,15 @@ def frontier_demo_restarts(steps: int = 200) -> dict[str, Any]:
             row = []
             for i, info in enumerate(infos):
                 restart = base.reset_infos[i]
-                row.append([
-                    plain(info.get("x_pos")), bool(dones[i]), plain(restart.get("frontier_start")),
-                    plain(restart.get("demo_start")), plain(restart.get("demo_outcome")),
-                ])
+                row.append(
+                    [
+                        plain(info.get("x_pos")),
+                        bool(dones[i]),
+                        plain(restart.get("frontier_start")),
+                        plain(restart.get("demo_start")),
+                        plain(restart.get("demo_outcome")),
+                    ]
+                )
             info_chain.update(json.dumps(row).encode())
         return result({"info_chain": info_chain.final()}, {"obs_chain": obs_chain.final()})
     finally:
@@ -482,7 +545,9 @@ def bc_datasets(max_noop: int = 2) -> dict[str, Any]:
             "pairs": int(len(actions)),
             "obs_shape": list(obs.shape),
             "actions": sha(actions.tobytes()),
-            "warnings": sorted(str(w.message) for w in caught if issubclass(w.category, UserWarning)),
+            "warnings": sorted(
+                str(w.message) for w in caught if issubclass(w.category, UserWarning)
+            ),
         }
         bound[name] = {"obs": sha(obs.tobytes())}
     return result(exact, bound)
@@ -595,7 +660,10 @@ def policy_behaviour(offsets: tuple[int, ...] = (0, 1, 2, 7, 15, 30)) -> dict[st
                         ended = "terminated" if terminated else "truncated"
                         break
                 out[f"{lv}/{offset}"] = {
-                    "steps": steps, "max_x": max_x, "flag": flag, "ended": ended,
+                    "steps": steps,
+                    "max_x": max_x,
+                    "flag": flag,
+                    "ended": ended,
                     "actions": sha(bytes(chosen)),
                 }
             finally:
@@ -603,11 +671,18 @@ def policy_behaviour(offsets: tuple[int, ...] = (0, 1, 2, 7, 15, 30)) -> dict[st
     return result(out)
 
 
-def _run_cli(command: str, args: list[str], workdir: Path, timeout: int = 900) -> subprocess.CompletedProcess:
+def _run_cli(
+    command: str, args: list[str], workdir: Path, timeout: int = 900
+) -> subprocess.CompletedProcess:
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
     return subprocess.run(
-        [*a.cli_command(command), *args], cwd=workdir, env=env, capture_output=True, text=True,
-        timeout=timeout, check=False,
+        [*a.cli_command(command), *args],
+        cwd=workdir,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
     )
 
 
@@ -622,12 +697,33 @@ def _final_model_digest(path: Path) -> tuple[int | None, dict[str, Any]]:
 
 def train_smoke() -> dict[str, Any]:
     """Train for 2048 steps on two workers, then resume the checkpoint to 4096 steps."""
-    base = ["--total-timesteps", "2048", "--num-envs", "2", "--eval-freq", "0", "--device", "cpu",
-            "--seed", "42"]
+    base = [
+        "--total-timesteps",
+        "2048",
+        "--num-envs",
+        "2",
+        "--eval-freq",
+        "0",
+        "--device",
+        "cpu",
+        "--seed",
+        "42",
+    ]
     variants = {
         "plain": ["--exp-name", "smoke_plain"],
-        "curriculum": ["--exp-name", "smoke_curriculum", "--levels", "1-1,1-3", "--frontier-starts", "0.5",
-                       "--demo-starts", "--demo-bc", "5", "--noop-max", "2"],
+        "curriculum": [
+            "--exp-name",
+            "smoke_curriculum",
+            "--levels",
+            "1-1,1-3",
+            "--frontier-starts",
+            "0.5",
+            "--demo-starts",
+            "--demo-bc",
+            "5",
+            "--noop-max",
+            "2",
+        ],
     }
     exact: dict[str, Any] = {}
     bound: dict[str, Any] = {}
@@ -644,14 +740,33 @@ def train_smoke() -> dict[str, Any]:
                 "layout": digest["layout"],
             }
             bound[name] = {"weights": digest["weights"]}
-        resumed = _run_cli("train", [
-            "--resume", str(workdir / "runs" / "smoke_plain" / "checkpoints" / "final_model"),
-            "--total-timesteps", "4096", "--num-envs", "2", "--eval-freq", "0", "--device", "cpu",
-            "--seed", "42", "--exp-name", "smoke_resumed",
-        ], workdir)
+        resumed = _run_cli(
+            "train",
+            [
+                "--resume",
+                str(workdir / "runs" / "smoke_plain" / "checkpoints" / "final_model"),
+                "--total-timesteps",
+                "4096",
+                "--num-envs",
+                "2",
+                "--eval-freq",
+                "0",
+                "--device",
+                "cpu",
+                "--seed",
+                "42",
+                "--exp-name",
+                "smoke_resumed",
+            ],
+            workdir,
+        )
         run = workdir / "runs" / "smoke_resumed" / "checkpoints"
         steps, digest = _final_model_digest(run / "final_model.zip")
-        exact["resumed"] = {"returncode": resumed.returncode, "num_timesteps": steps, "layout": digest["layout"]}
+        exact["resumed"] = {
+            "returncode": resumed.returncode,
+            "num_timesteps": steps,
+            "layout": digest["layout"],
+        }
         bound["resumed"] = {"weights": digest["weights"]}
     return result(exact, bound)
 
@@ -660,10 +775,22 @@ def evaluate_cli() -> dict[str, Any]:
     """Evaluate the reference checkpoint on 1-1 for two episodes through the command line."""
     with tempfile.TemporaryDirectory() as tmp:
         workdir = Path(tmp)
-        proc = _run_cli("evaluate", [
-            "--model-path", str(a.CHECKPOINT), "--levels", "1-1", "--n-episodes", "2",
-            "--device", "cpu", "--seed", "42",
-        ], workdir)
+        proc = _run_cli(
+            "evaluate",
+            [
+                "--model-path",
+                str(a.CHECKPOINT),
+                "--levels",
+                "1-1",
+                "--n-episodes",
+                "2",
+                "--device",
+                "cpu",
+                "--seed",
+                "42",
+            ],
+            workdir,
+        )
         (report,) = workdir.glob("eval_results_ppo_*.json")
         data = json.loads(report.read_text())
     data.pop("timestamp")

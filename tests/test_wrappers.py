@@ -40,7 +40,10 @@ def test_skip_frame_stops_early_when_the_episode_ends() -> None:
 
 def test_skip_frame_sends_no_buttons_after_the_flag_is_touched() -> None:
     """The game ignores input in the end sequence, and the next level must not inherit a held A."""
-    rows = [(0.0, False, False, level_info()), (0.0, False, False, level_info(flag_get=True))] + _rows(2)
+    rows = [
+        (0.0, False, False, level_info()),
+        (0.0, False, False, level_info(flag_get=True)),
+    ] + _rows(2)
     env = ScriptedEnv(level_info(), rows)
     wrapped = a.SkipFrame(env, skip=4)
     wrapped.reset()
@@ -50,7 +53,9 @@ def test_skip_frame_sends_no_buttons_after_the_flag_is_touched() -> None:
 
 def test_skip_frame_ends_the_step_when_a_new_level_starts() -> None:
     """The remaining frames would replay an action chosen on the previous level's screen."""
-    rows = [(1.0, False, False, level_info(1, 1)), (1.0, False, False, level_info(1, 2))] + _rows(2, stage=2)
+    rows = [(1.0, False, False, level_info(1, 1)), (1.0, False, False, level_info(1, 2))] + _rows(
+        2, stage=2
+    )
     env = ScriptedEnv(level_info(1, 1), rows)
     wrapped = a.SkipFrame(env, skip=4)
     wrapped.reset()
@@ -82,7 +87,10 @@ def test_stall_truncation_restarts_the_count_on_a_new_furthest_x() -> None:
 
 def test_stall_truncation_measures_progress_per_life() -> None:
     """x_pos restarts at a respawn, so a new life begins a new segment."""
-    rows = [(0.0, False, False, level_info(x_pos=500)), (0.0, False, False, level_info(x_pos=40, life=1))]
+    rows = [
+        (0.0, False, False, level_info(x_pos=500)),
+        (0.0, False, False, level_info(x_pos=40, life=1)),
+    ]
     env = ScriptedEnv(level_info(x_pos=40), rows * 3)
     wrapped = a.StallTruncation(env, max_steps=1)
     wrapped.reset()
@@ -149,7 +157,9 @@ def test_custom_reward_charges_a_lost_life() -> None:
 
 def test_custom_reward_charges_a_death_that_ends_the_episode() -> None:
     """The final death wraps life to 255, so termination without the flag is the signal."""
-    wrapped = a.CustomReward(ScriptedEnv(level_info(life=0), [(1.0, True, False, level_info(life=255))]))
+    wrapped = a.CustomReward(
+        ScriptedEnv(level_info(life=0), [(1.0, True, False, level_info(life=255))])
+    )
     wrapped.reset()
     assert wrapped.step(0)[1] == pytest.approx((1.0 - 50) / 10)
 
