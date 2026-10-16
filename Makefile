@@ -61,8 +61,7 @@ smoke:
 docker-check:
 	docker build -t mario-rl-ppo .
 	docker run --rm mario-rl-ppo
-	docker run --rm mario-rl-ppo python -c "import sys; sys.path.insert(0, 'src'); \
-from environments.env_factory import load_demo_route; \
+	docker run --rm mario-rl-ppo python -c "from mario.environments.env_factory import load_demo_route; \
 assert all(load_demo_route(f'SuperMarioBros-1-{s}-v0') for s in (1, 2, 3, 4))"
 	docker run --rm mario-rl-ppo sh -c 'touch /app/.w && rm /app/.w'
 	docker compose config -q

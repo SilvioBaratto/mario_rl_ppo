@@ -6,7 +6,6 @@ import argparse
 import json
 import multiprocessing
 import os
-import sys
 import time
 import warnings
 
@@ -18,9 +17,12 @@ import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from environments.env_factory import DEMO_ROUTES_DIR, FRAME_SKIP, SMB1_FLOAT_STATE, parse_levels
+from mario.environments.env_factory import (
+    DEMO_ROUTES_DIR,
+    FRAME_SKIP,
+    SMB1_FLOAT_STATE,
+    parse_levels,
+)
 
 # SMB1 RAM: area type (0 water, 1 ground, 2 underground, 3 castle) and the
 # pointer of the area being played; together they identify an area of a level.
@@ -64,7 +66,7 @@ def parse_args():
         "--output",
         type=str,
         default=None,
-        help="Route file (default: src/environments/demo_routes/<W>-<S>.json)",
+        help="Route file (default: mario/environments/demo_routes/<W>-<S>.json)",
     )
     parser.add_argument("--force", action="store_true", help="Overwrite an existing route file")
     parser.add_argument("--seed", type=int, default=0, help="Seed of the first search")

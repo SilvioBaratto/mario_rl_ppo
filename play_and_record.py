@@ -4,7 +4,6 @@ Simple script to play one game with a trained model and record video
 
 import argparse
 import os
-import sys
 
 # Configure SDL for video recording
 os.environ["SDL_AUDIODRIVER"] = "dummy"
@@ -15,10 +14,8 @@ import imageio
 import numpy as np
 import torch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from agents.ppo_agent import load_mario_model
-from environments.env_factory import (
+from mario.agents.ppo_agent import load_mario_model
+from mario.environments.env_factory import (
     DEFAULT_ENV_ID,
     GameProgress,
     create_vec_env,

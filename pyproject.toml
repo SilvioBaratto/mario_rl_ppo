@@ -1,8 +1,66 @@
-# Tool configuration only. Packaging metadata joins this file when the code moves into a package.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mario-rl-ppo"
+version = "0.1.0"
+description = "A PPO agent (Stable Baselines3) that learns Super Mario Bros from pixels, with demonstration routes, a reverse curriculum and behaviour cloning."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Silvio Baratto" }]
+keywords = [
+    "reinforcement-learning",
+    "ppo",
+    "super-mario-bros",
+    "stable-baselines3",
+    "behaviour-cloning",
+    "curriculum-learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# Pinned exactly, unlike the floors in the other repos: trained checkpoints and the golden traces
+# in tests/golden depend on the emulator, the observation pipeline and the torch/SB3 numerics.
+# requirements.txt, which the Docker image and CI install from, carries the same pins.
+dependencies = [
+    "gym-super-mario-bros==9.1.0",
+    "nes-py==9.0.1",
+    "torch==2.14.1",
+    "numpy==2.5.4",
+    "stable-baselines3[extra]==2.9.0",
+    "gymnasium==1.4.0",
+    "opencv-python==5.0.0.93",
+    "imageio==2.38.1",
+    "imageio-ffmpeg==0.6.0",
+    "tqdm==4.70.1",
+    "tensorboard==2.21.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/SilvioBaratto/mario_rl_ppo"
+Repository = "https://github.com/SilvioBaratto/mario_rl_ppo"
+Issues = "https://github.com/SilvioBaratto/mario_rl_ppo/issues"
+
+[project.optional-dependencies]
+# ruff is banded to one minor release: it widens its default rules between minors, and a new
+# release must not turn CI red on its own.
+dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "pyright>=1.1"]
+
+[tool.setuptools.packages.find]
+include = ["mario*"]
+
+[tool.setuptools.package-data]
+mario = ["environments/demo_routes/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "src"]
+pythonpath = ["."]
 addopts = ["--strict-markers"]
 markers = [
     "emulator: needs gym-super-mario-bros and nes-py with the bundled ROM (headless, no display)",
@@ -16,14 +74,20 @@ line-length = 100
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "UP", "B"]
+select = ["E", "F", "I", "W", "UP", "B", "TID251"]
 ignore = [
     "B905",  # zip() strict= — the paired iterables are equal-length by construction here
 ]
 
+# Every saved checkpoint pickles MarioCNN under the import path agents.ppo_agent, which no longer
+# exists. They load only because load_mario_model replaces the saved policy_kwargs.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"stable_baselines3.PPO.load".msg = "Use mario.agents.ppo_agent.load_mario_model; a plain PPO.load fails on every checkpoint saved before the package move."
+
 [tool.ruff.lint.per-file-ignores]
-# The entry scripts set SDL_VIDEODRIVER/SDL_AUDIODRIVER (and put src/ on sys.path) before the
-# imports that would initialise pygame or load the emulator.
+"mario/agents/ppo_agent.py" = ["TID251"]
+# The entry scripts set SDL_VIDEODRIVER/SDL_AUDIODRIVER before the imports that would
+# initialise pygame or load the emulator.
 "train.py" = ["E402"]
 "evaluate.py" = ["E402"]
 "play_and_record.py" = ["E402"]
@@ -31,5 +95,5 @@ ignore = [
 
 [tool.pyright]
 pythonVersion = "3.13"
-extraPaths = [".", "src"]
-include = ["src", "tests", "train.py", "evaluate.py", "play_and_record.py", "find_route.py"]
+extraPaths = ["."]
+include = ["mario", "tests", "train.py", "evaluate.py", "play_and_record.py", "find_route.py"]

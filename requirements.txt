@@ -1,3 +1,7 @@
+# Exact pins of the runtime that the golden traces and trained checkpoints were made with.
+# The dependencies in pyproject.toml are a subset of these; tests/test_packaging.py keeps
+# the two in step.
+#
 # Core dependencies (9.x requires Python >= 3.13)
 gym-super-mario-bros==9.1.0
 nes-py==9.0.1

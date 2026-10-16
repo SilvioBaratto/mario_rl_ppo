@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
-from environments.env_factory import create_mario_env
+from mario.environments.env_factory import create_mario_env
 
 
 def build_demo_dataset(

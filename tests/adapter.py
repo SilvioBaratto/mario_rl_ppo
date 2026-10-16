@@ -16,9 +16,18 @@ import evaluate as _evaluate
 import find_route as _find_route
 import play_and_record as _play_and_record
 import train as _train
-from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
-from agents.ppo_agent import MarioCNN, load_mario_model, mario_policy_kwargs, resolve_model_path
-from environments.env_factory import (
+from mario.agents.demo_cloning import (
+    DemoCloningCallback,
+    build_demo_dataset,
+    build_game_demo_dataset,
+)
+from mario.agents.ppo_agent import (
+    MarioCNN,
+    load_mario_model,
+    mario_policy_kwargs,
+    resolve_model_path,
+)
+from mario.environments.env_factory import (
     DEFAULT_ENV_ID,
     DEMO_ROUTES_DIR,
     DEMO_STRIDE,
@@ -49,7 +58,7 @@ from environments.env_factory import (
     replay_demo_route,
     route_level,
 )
-from utils.logger import setup_logger
+from mario.utils.logger import setup_logger
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUTES_DIR = DEMO_ROUTES_DIR

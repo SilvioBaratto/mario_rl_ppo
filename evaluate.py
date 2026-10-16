@@ -4,7 +4,6 @@ Evaluation script for trained Mario RL agents
 
 import argparse
 import os
-import sys
 
 temp_parser = argparse.ArgumentParser(add_help=False)
 temp_parser.add_argument("--record-video", action="store_true")
@@ -25,10 +24,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from agents.ppo_agent import load_mario_model
-from environments.env_factory import (
+from mario.agents.ppo_agent import load_mario_model
+from mario.environments.env_factory import (
     DEFAULT_ENV_ID,
     GameProgress,
     create_vec_env,

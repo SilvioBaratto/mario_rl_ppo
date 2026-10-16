@@ -3,7 +3,6 @@
 import argparse
 import os
 import signal
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -12,15 +11,17 @@ import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
 # Configure SDL drivers before environment creation
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-from agents.demo_cloning import DemoCloningCallback, build_demo_dataset, build_game_demo_dataset
-from agents.ppo_agent import load_mario_model, mario_policy_kwargs
-from environments.env_factory import (
+from mario.agents.demo_cloning import (
+    DemoCloningCallback,
+    build_demo_dataset,
+    build_game_demo_dataset,
+)
+from mario.agents.ppo_agent import load_mario_model, mario_policy_kwargs
+from mario.environments.env_factory import (
     DEFAULT_ENV_ID,
     ReverseCurriculum,
     assign_levels,
@@ -30,7 +31,7 @@ from environments.env_factory import (
     load_demo_route,
     parse_levels,
 )
-from utils.logger import setup_logger
+from mario.utils.logger import setup_logger
 
 LEARNING_RATE = 1e-4
 CLIP_RANGE = 0.2
@@ -164,7 +165,7 @@ def parse_args():
         "--demo-starts",
         action="store_true",
         help="With --frontier-starts, run a reverse curriculum on levels with a "
-        "recorded route (src/environments/demo_routes/<W>-<S>.json): their "
+        "recorded route (mario/environments/demo_routes/<W>-<S>.json): their "
         "restarts begin near the route end and move back as the agent succeeds",
     )
     parser.add_argument(
