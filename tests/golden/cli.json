@@ -1,0 +1,67 @@
+{
+ "exact": {
+  "evaluate": {
+   "deterministic": "True",
+   "device": "'auto'",
+   "env_id": "'SuperMarioBros-1-1-v0'",
+   "frame_stack": "4",
+   "levels": "None",
+   "model_path": "'model'",
+   "n_episodes": "10",
+   "noop_max": "30",
+   "record_video": "False",
+   "render": "False",
+   "seed": "42",
+   "stall_steps": "150",
+   "stochastic": "False",
+   "video_dir": "'eval_videos'"
+  },
+  "find-route": {
+   "budget": "60000",
+   "force": "False",
+   "level": "'1-1'",
+   "max_noop": "30",
+   "output": "None",
+   "searches": "20",
+   "seed": "0",
+   "workers": "4"
+  },
+  "record": {
+   "device": "'auto'",
+   "env_id": "'SuperMarioBros-1-1-v0'",
+   "frame_stack": "4",
+   "max_steps": "5000",
+   "model_path": "'model'",
+   "noop_max": "30",
+   "output": "None",
+   "seed": "42",
+   "stall_steps": "150",
+   "stochastic": "False",
+   "stop_at_level": "None"
+  },
+  "train": {
+   "batch_size": "256",
+   "demo_bc": "0",
+   "demo_start_frames": "None",
+   "demo_starts": "False",
+   "device": "'auto'",
+   "env_id": "'SuperMarioBros-1-1-v0'",
+   "eval_episodes": "3",
+   "eval_freq": "50000",
+   "exp_name": "None",
+   "frame_stack": "4",
+   "frontier_starts": "0.0",
+   "levels": "None",
+   "n_epochs": "10",
+   "noop_max": "30",
+   "num_envs": "8",
+   "resume": "None",
+   "save_freq": "100000",
+   "seed": "42",
+   "stall_steps": "150",
+   "total_timesteps": "10000000"
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

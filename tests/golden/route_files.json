@@ -1,0 +1,118 @@
+{
+ "exact": {
+  "1-1.json": {
+   "agent_actions": 270,
+   "env_id": "SuperMarioBros-1-1-v0",
+   "frames": 1080,
+   "sha256": "5ea7e9712d9c28792d4b2d93859c350feec2f1edd042e12510e2e28b45f39a3b",
+   "waypoints": [
+    [
+     241,
+     720
+    ],
+    [
+     510,
+     1449
+    ],
+    [
+     720,
+     2079
+    ],
+    [
+     1080,
+     3161
+    ]
+   ]
+  },
+  "1-2.json": {
+   "agent_actions": 363,
+   "env_id": "SuperMarioBros-1-2-v0",
+   "frames": 1449,
+   "sha256": "5803cefd0f1e27dea5f071ceab136a0d2f965147a3945d90e3bb8e93275f53a2",
+   "waypoints": [
+    [
+     247,
+     347
+    ],
+    [
+     489,
+     723
+    ],
+    [
+     720,
+     1214
+    ],
+    [
+     966,
+     1701
+    ],
+    [
+     1231,
+     2362
+    ],
+    [
+     1449,
+     3161
+    ]
+   ]
+  },
+  "1-3.json": {
+   "agent_actions": 219,
+   "env_id": "SuperMarioBros-1-3-v0",
+   "frames": 873,
+   "sha256": "c813637c8b47bb5ba49d77b6e2c13fdb1670ed6c3fcad299b9da7a39eefe4c62",
+   "waypoints": [
+    [
+     188,
+     561
+    ],
+    [
+     248,
+     741
+    ],
+    [
+     404,
+     1209
+    ],
+    [
+     653,
+     1941
+    ],
+    [
+     873,
+     2425
+    ]
+   ]
+  },
+  "1-4.json": {
+   "agent_actions": 288,
+   "env_id": "SuperMarioBros-1-4-v0",
+   "frames": 1151,
+   "sha256": "ef692d8ca2e251907e9ef17533e8eeedb5d2fdf7c43def1dcf5bee38ceedde12",
+   "waypoints": [
+    [
+     240,
+     585
+    ],
+    [
+     480,
+     1201
+    ],
+    [
+     720,
+     1444
+    ],
+    [
+     960,
+     1856
+    ],
+    [
+     1151,
+     2244
+    ]
+   ]
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

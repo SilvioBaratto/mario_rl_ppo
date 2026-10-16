@@ -85,3 +85,5 @@ docs/_build/
 !configs/*.yaml
 !configs/*.json
 !src/environments/demo_routes/*.json
+# Golden traces and fixtures of the behaviour-preservation tests must be tracked.
+!tests/**/*.json

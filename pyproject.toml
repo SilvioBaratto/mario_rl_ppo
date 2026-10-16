@@ -1,0 +1,12 @@
+# Tool configuration only. Packaging metadata joins this file when the code moves into a package.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+addopts = ["--strict-markers"]
+markers = [
+    "emulator: needs gym-super-mario-bros and nes-py with the bundled ROM (headless, no display)",
+    "slow: replays every NOOP offset or trains, tens of seconds each (excluded from PR CI)",
+    "integration: spawns SubprocVecEnv workers or runs a CLI as a subprocess",
+    "local_golden: needs a checkpoint under runs/ that git does not track",
+]

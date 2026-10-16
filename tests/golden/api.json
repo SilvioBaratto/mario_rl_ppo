@@ -1,0 +1,802 @@
+{
+ "exact": {
+  "constants": {
+   "CLIP_RANGE": "0.2",
+   "DEFAULT_ENV_ID": "'SuperMarioBros-1-1-v0'",
+   "DEMO_STRIDE": "8",
+   "FRAME_SKIP": "4",
+   "HUD_ROWS": "32",
+   "LEARNING_RATE": "0.0001",
+   "NOOP_ACTION": "0",
+   "SMB1_FLOAT_STATE": "29"
+  },
+  "symbols": {
+   "CustomReward": {
+    "bases": [
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "reset",
+     "step"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "DemoCloningCallback": {
+    "bases": [
+     "BaseCallback",
+     "ABC",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "observations",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "actions",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "steps",
+      "POSITIONAL_OR_KEYWORD",
+      "10"
+     ],
+     [
+      "batch_size",
+      "POSITIONAL_OR_KEYWORD",
+      "256"
+     ],
+     [
+      "seed",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ],
+     [
+      "verbose",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ]
+    ]
+   },
+   "FrontierStart": {
+    "bases": [
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "frontier",
+     "reset",
+     "set_demo_cursor",
+     "step"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "prob",
+      "POSITIONAL_OR_KEYWORD",
+      "0.5"
+     ],
+     [
+      "back_min",
+      "POSITIONAL_OR_KEYWORD",
+      "50"
+     ],
+     [
+      "back_max",
+      "POSITIONAL_OR_KEYWORD",
+      "400"
+     ],
+     [
+      "bucket",
+      "POSITIONAL_OR_KEYWORD",
+      "32"
+     ],
+     [
+      "window",
+      "POSITIONAL_OR_KEYWORD",
+      "20"
+     ],
+     [
+      "min_episodes",
+      "POSITIONAL_OR_KEYWORD",
+      "5"
+     ],
+     [
+      "demo_routes",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "demo_exact",
+      "POSITIONAL_OR_KEYWORD",
+      "0.75"
+     ],
+     [
+      "warmup_frames",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ]
+    ]
+   },
+   "GameProgress": {
+    "bases": [
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "summary",
+     "update"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "GrayResizeObservation": {
+    "bases": [
+     "ObservationWrapper",
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "observation"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "size",
+      "POSITIONAL_OR_KEYWORD",
+      "84"
+     ]
+    ]
+   },
+   "LevelStartFrameStack": {
+    "bases": [
+     "VecFrameStack",
+     "VecEnvWrapper",
+     "VecEnv",
+     "ABC",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "step_wait"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "venv",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "n_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "channels_order",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ]
+    ]
+   },
+   "MarioCNN": {
+    "bases": [
+     "BaseFeaturesExtractor",
+     "Module",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "forward"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "observation_space",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "features_dim",
+      "POSITIONAL_OR_KEYWORD",
+      "512"
+     ]
+    ]
+   },
+   "NoopReset": {
+    "bases": [
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "reset"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "noop_max",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ]
+    ]
+   },
+   "ReverseCurriculum": {
+    "bases": [
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "cursors",
+     "record"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "routes",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "warmup_frames",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "threshold",
+      "POSITIONAL_OR_KEYWORD",
+      "0.5"
+     ],
+     [
+      "window",
+      "POSITIONAL_OR_KEYWORD",
+      "10"
+     ],
+     [
+      "start_frames",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ]
+    ]
+   },
+   "SkipFrame": {
+    "bases": [
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "reset",
+     "step"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "skip",
+      "POSITIONAL_OR_KEYWORD",
+      "4"
+     ]
+    ]
+   },
+   "StallTruncation": {
+    "bases": [
+     "Wrapper",
+     "Env",
+     "Generic",
+     "object"
+    ],
+    "kind": "class",
+    "methods": [
+     "reset",
+     "step"
+    ],
+    "params": [
+     [
+      "self",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "max_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "150"
+     ]
+    ]
+   },
+   "assign_levels": {
+    "kind": "function",
+    "params": [
+     [
+      "env_ids",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "num_envs",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "build_demo_dataset": {
+    "kind": "function",
+    "params": [
+     [
+      "routes",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "frame_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "4"
+     ],
+     [
+      "max_noop",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ]
+    ]
+   },
+   "build_game_demo_dataset": {
+    "kind": "function",
+    "params": [
+     [
+      "routes",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "frame_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "4"
+     ],
+     [
+      "max_noop",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ]
+    ]
+   },
+   "create_eval_env": {
+    "kind": "function",
+    "params": [
+     [
+      "env_id",
+      "POSITIONAL_OR_KEYWORD",
+      "'SuperMarioBros-1-1-v0'"
+     ],
+     [
+      "frame_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "4"
+     ],
+     [
+      "seed",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "use_custom_reward",
+      "POSITIONAL_OR_KEYWORD",
+      "True"
+     ],
+     [
+      "noop_max",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ],
+     [
+      "stall_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "150"
+     ]
+    ]
+   },
+   "create_mario_env": {
+    "kind": "function",
+    "params": [
+     [
+      "env_id",
+      "POSITIONAL_OR_KEYWORD",
+      "'SuperMarioBros-1-1-v0'"
+     ],
+     [
+      "seed",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "return_base_env",
+      "POSITIONAL_OR_KEYWORD",
+      "False"
+     ],
+     [
+      "max_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "2000"
+     ],
+     [
+      "use_custom_reward",
+      "POSITIONAL_OR_KEYWORD",
+      "True"
+     ],
+     [
+      "render_mode",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "noop_max",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ],
+     [
+      "stall_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "150"
+     ],
+     [
+      "frontier_prob",
+      "POSITIONAL_OR_KEYWORD",
+      "0.0"
+     ],
+     [
+      "demo_starts",
+      "POSITIONAL_OR_KEYWORD",
+      "False"
+     ],
+     [
+      "demo_warmup",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ]
+    ]
+   },
+   "create_vec_env": {
+    "kind": "function",
+    "params": [
+     [
+      "num_envs",
+      "POSITIONAL_OR_KEYWORD",
+      "8"
+     ],
+     [
+      "env_id",
+      "POSITIONAL_OR_KEYWORD",
+      "'SuperMarioBros-1-1-v0'"
+     ],
+     [
+      "frame_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "4"
+     ],
+     [
+      "seed",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "use_subproc",
+      "POSITIONAL_OR_KEYWORD",
+      "True"
+     ],
+     [
+      "use_custom_reward",
+      "POSITIONAL_OR_KEYWORD",
+      "True"
+     ],
+     [
+      "render_mode",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "noop_max",
+      "POSITIONAL_OR_KEYWORD",
+      "30"
+     ],
+     [
+      "max_episode_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "2000"
+     ],
+     [
+      "stall_steps",
+      "POSITIONAL_OR_KEYWORD",
+      "150"
+     ],
+     [
+      "frontier_prob",
+      "POSITIONAL_OR_KEYWORD",
+      "0.0"
+     ],
+     [
+      "demo_starts",
+      "POSITIONAL_OR_KEYWORD",
+      "False"
+     ]
+    ]
+   },
+   "demo_start_frames": {
+    "kind": "function",
+    "params": [
+     [
+      "route",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "stride",
+      "POSITIONAL_OR_KEYWORD",
+      "8"
+     ],
+     [
+      "warmup_frames",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ]
+    ]
+   },
+   "demo_warmup_frames": {
+    "kind": "function",
+    "params": [
+     [
+      "frame_stack",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "episode_end_reason": {
+    "kind": "function",
+    "params": [
+     [
+      "info",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "is_single_stage": {
+    "kind": "function",
+    "params": [
+     [
+      "env_id",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "level_key": {
+    "kind": "function",
+    "params": [
+     [
+      "world",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "stage",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "load_demo_route": {
+    "kind": "function",
+    "params": [
+     [
+      "env_id",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "load_mario_model": {
+    "kind": "function",
+    "params": [
+     [
+      "path",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "env",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "device",
+      "POSITIONAL_OR_KEYWORD",
+      "'auto'"
+     ],
+     [
+      "custom_objects",
+      "POSITIONAL_OR_KEYWORD",
+      "None"
+     ],
+     [
+      "kwargs",
+      "VAR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "mario_policy_kwargs": {
+    "kind": "function",
+    "params": [
+     [
+      "features_dim",
+      "POSITIONAL_OR_KEYWORD",
+      "512"
+     ]
+    ]
+   },
+   "parse_levels": {
+    "kind": "function",
+    "params": [
+     [
+      "spec",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "replay_demo_route": {
+    "kind": "function",
+    "params": [
+     [
+      "nes",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "route",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "stride",
+      "POSITIONAL_OR_KEYWORD",
+      "8"
+     ],
+     [
+      "warmup_frames",
+      "POSITIONAL_OR_KEYWORD",
+      "0"
+     ]
+    ]
+   },
+   "resolve_model_path": {
+    "kind": "function",
+    "params": [
+     [
+      "path",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "route_level": {
+    "kind": "function",
+    "params": [
+     [
+      "route",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ]
+    ]
+   },
+   "setup_logger": {
+    "kind": "function",
+    "params": [
+     [
+      "log_dir",
+      "POSITIONAL_OR_KEYWORD",
+      "<required>"
+     ],
+     [
+      "name",
+      "POSITIONAL_OR_KEYWORD",
+      "'mario_rl'"
+     ]
+    ]
+   }
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

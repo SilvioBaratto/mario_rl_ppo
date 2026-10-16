@@ -1,0 +1,37 @@
+{
+ "exact": {
+  "curriculum": {
+   "checkpoints": [
+    "final_model.zip"
+   ],
+   "layout": "a162456881fa1e4ea1f0838413e35622f9227559b7b8e3c1b3720f837c2be52d",
+   "num_timesteps": 2048,
+   "returncode": 0
+  },
+  "plain": {
+   "checkpoints": [
+    "final_model.zip"
+   ],
+   "layout": "a162456881fa1e4ea1f0838413e35622f9227559b7b8e3c1b3720f837c2be52d",
+   "num_timesteps": 2048,
+   "returncode": 0
+  },
+  "resumed": {
+   "layout": "a162456881fa1e4ea1f0838413e35622f9227559b7b8e3c1b3720f837c2be52d",
+   "num_timesteps": 4096,
+   "returncode": 0
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {
+  "curriculum": {
+   "weights": "f5c1d615f0a5f2a865ec2b0128c08b41750d35b76aa428a4f25c21e5b597faae"
+  },
+  "plain": {
+   "weights": "c4eee2134783446b1d3554527e5de4c54987f1c5627d409a864119cfc0025aea"
+  },
+  "resumed": {
+   "weights": "6f93be2b389ac650857796ac7d38921d4bf990aec5d39afcd5bdab3a26356a5e"
+  }
+ }
+}
