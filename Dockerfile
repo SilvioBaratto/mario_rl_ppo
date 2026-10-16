@@ -1,7 +1,7 @@
 # Super Mario Bros RL with PPO
-# Multi-stage build for optimized image size
+# Single-stage image; torch comes from the CPU-only wheel index to keep it small
 
-FROM python:3.13-slim as base
+FROM python:3.13-slim AS base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash mario
 WORKDIR /app
+# WORKDIR is created as root; evaluate and record write their outputs into it as `mario`.
+RUN chown mario:mario /app
 
 # Copy requirements first for better caching
 COPY requirements.txt .

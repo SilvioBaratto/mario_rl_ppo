@@ -47,9 +47,11 @@ services:
     environment:
       - SDL_VIDEODRIVER=dummy
       - SDL_AUDIODRIVER=dummy
+    # The report is written to the working directory, so run inside the mounted runs/.
+    working_dir: /app/runs
     command: >
-      python evaluate.py
-        --model-path runs/docker_train/checkpoints/best_model
+      python /app/evaluate.py
+        --model-path /app/runs/docker_train/checkpoints/best_model
         --n-episodes 10
     profiles:
       - eval
@@ -68,6 +70,7 @@ services:
     command: >
       python play_and_record.py
         --model-path runs/docker_train/checkpoints/best_model
+        --output videos/docker_train.mp4
     profiles:
       - record
 
