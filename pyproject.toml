@@ -28,3 +28,8 @@ ignore = [
 "evaluate.py" = ["E402"]
 "play_and_record.py" = ["E402"]
 "find_route.py" = ["E402"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+extraPaths = [".", "src"]
+include = ["src", "tests", "train.py", "evaluate.py", "play_and_record.py", "find_route.py"]
