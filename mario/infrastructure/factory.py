@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import multiprocessing
 import signal
+from typing import Literal, cast, overload
 
 import gym_super_mario_bros
+import gymnasium as gym
+import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from gymnasium.wrappers import TimeLimit
 from nes_py.wrappers import JoypadSpace
@@ -56,13 +59,48 @@ class LevelStartFrameStack(VecFrameStack):
             The usual (observations, rewards, dones, infos) of ``VecFrameStack``.
         """
         observations, rewards, dones, infos = super().step_wait()
-        frame = self.venv.observation_space.shape[-1]
+        observations = cast(np.ndarray, observations)
+        frame = cast(tuple[int, ...], self.venv.observation_space.shape)[-1]
+        history = cast(np.ndarray, self.stacked_obs.stacked_obs)
         for idx, info in enumerate(infos):
             if info.get("level_start") and not dones[idx]:
                 # update() returns its own buffer, so this clears the kept history too.
-                self.stacked_obs.stacked_obs[idx, ..., :-frame] = 0
+                history[idx, ..., :-frame] = 0
                 observations[idx, ..., :-frame] = 0
         return observations, rewards, dones, infos
+
+
+@overload
+def create_mario_env(
+    env_id: str = ...,
+    seed: int | None = ...,
+    return_base_env: Literal[False] = ...,
+    max_steps: int = ...,
+    use_custom_reward: bool = ...,
+    render_mode: str | None = ...,
+    noop_max: int = ...,
+    stall_steps: int = ...,
+    frontier_prob: float = ...,
+    demo_starts: bool = ...,
+    demo_warmup: int = ...,
+) -> GrayResizeObservation: ...
+
+
+@overload
+def create_mario_env(
+    env_id: str = ...,
+    seed: int | None = ...,
+    *,
+    return_base_env: Literal[True],
+    max_steps: int = ...,
+    use_custom_reward: bool = ...,
+    render_mode: str | None = ...,
+    noop_max: int = ...,
+    stall_steps: int = ...,
+    frontier_prob: float = ...,
+    demo_starts: bool = ...,
+    demo_warmup: int = ...,
+) -> tuple[GrayResizeObservation, gym.Env]: ...
 
 
 def create_mario_env(
@@ -77,7 +115,7 @@ def create_mario_env(
     frontier_prob: float = 0.0,
     demo_starts: bool = False,
     demo_warmup: int = 0,
-):
+) -> GrayResizeObservation | tuple[GrayResizeObservation, gym.Env]:
     """Create a Super Mario Bros environment with preprocessing wrappers.
 
     Args:

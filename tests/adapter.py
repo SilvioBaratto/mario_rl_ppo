@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mario.cli.app import build_parser
 from mario.domain.config import (
@@ -44,6 +44,7 @@ from mario.infrastructure.model import (
     mario_policy_kwargs,
     resolve_model_path,
 )
+from mario.infrastructure.nes import NesEmulator
 from mario.infrastructure.route_files import DEMO_ROUTES_DIR, load_demo_route
 from mario.infrastructure.run_logger import setup_logger
 from mario.infrastructure.wrappers import (
@@ -132,3 +133,15 @@ def cli_command(command: str) -> list[str]:
 def cli_env() -> dict[str, str]:
     """Return the environment a subprocess needs to import the package from the checkout."""
     return {"PYTHONPATH": str(ROOT)}
+
+
+def require_route(env_id: str) -> dict[str, Any]:
+    """Return the shipped route of ``env_id``; a missing route is a test setup error."""
+    route = load_demo_route(env_id)
+    assert route is not None, f"no demonstration route for {env_id}"
+    return route
+
+
+def raw_nes(env: Any) -> NesEmulator:
+    """Return the bare emulator underneath a gymnasium env."""
+    return cast(NesEmulator, env.unwrapped)

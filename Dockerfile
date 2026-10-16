@@ -37,12 +37,11 @@ RUN chown mario:mario /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies. torch/torchvision come from the CPU-only index
-# first: the PyPI Linux wheels pull the multi-GB CUDA toolkit, and the
-# containers train with --device cpu.
+# Install Python dependencies. torch comes from the CPU-only index first: the PyPI
+# Linux wheel pulls the multi-GB CUDA toolkit, and the containers train with
+# --device cpu.
 RUN pip install --upgrade pip && \
-    pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.14.1 torchvision==0.29.1 && \
+    pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1 && \
     pip install -r requirements.txt
 
 # Copy application code, then register the package and its `mario` command. The dependencies are

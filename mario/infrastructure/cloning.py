@@ -6,14 +6,17 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
+from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from torch.distributions import Categorical
 
 from mario.domain.config import FRAME_STACK, NOOP_MAX, OBS_SIZE
 from mario.infrastructure.factory import create_mario_env
+from mario.infrastructure.nes import NesEmulator
 
 
 def build_demo_dataset(
@@ -52,7 +55,7 @@ def build_demo_dataset(
         try:
             for noop in range(max_noop + 1):
                 frame, _ = env.reset()
-                nes = env.unwrapped
+                nes = cast(NesEmulator, env.unwrapped)
                 for _ in range(noop):
                     nes.step(0)
                 if noop:
@@ -128,7 +131,7 @@ def build_game_demo_dataset(
     try:
         for noop in range(max_noop + 1):
             frame, info = env.reset()
-            nes = env.unwrapped
+            nes = cast(NesEmulator, env.unwrapped)
             for _ in range(noop):
                 nes.step(0)
             if noop:
@@ -138,7 +141,7 @@ def build_game_demo_dataset(
             life = info["life"]
             for index, route in enumerate(routes):
                 level = (info.get("world"), info.get("stage"))
-                obs, done = [], False
+                obs, done, moved_on = [], False, False
                 for action in route["agent_actions"]:
                     obs.append(stack.transpose(2, 0, 1).copy())
                     frame, _, terminated, truncated, info = env.step(action)
@@ -215,8 +218,8 @@ class DemoCloningCallback(BaseCallback):
         self._observations = observations
         self._actions = actions
         self._rng = np.random.default_rng(seed)
-        self._obs_tensor = None
-        self._act_tensor = None
+        self._obs_tensor: torch.Tensor | None = None
+        self._act_tensor: torch.Tensor | None = None
 
     def _on_training_start(self) -> None:
         device = self.model.policy.device
@@ -224,7 +227,9 @@ class DemoCloningCallback(BaseCallback):
         self._act_tensor = torch.as_tensor(self._actions, device=device)
 
     def _on_rollout_start(self) -> None:
-        policy = self.model.policy
+        assert self._obs_tensor is not None and self._act_tensor is not None
+        model = cast(PPO, self.model)
+        policy = model.policy
         policy.set_training_mode(True)
         losses = []
         for _ in range(self.steps):
@@ -235,7 +240,7 @@ class DemoCloningCallback(BaseCallback):
             loss = -log_prob.mean()
             policy.optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(policy.parameters(), self.model.max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(policy.parameters(), model.max_grad_norm)
             policy.optimizer.step()
             losses.append(loss.item())
         policy.set_training_mode(False)
@@ -244,7 +249,8 @@ class DemoCloningCallback(BaseCallback):
             correct = 0
             for start in range(0, len(self._actions), 1024):
                 obs = self._obs_tensor[start : start + 1024]
-                greedy = policy.get_distribution(obs).distribution.probs.argmax(dim=1)
+                distribution = cast(Categorical, policy.get_distribution(obs).distribution)
+                greedy = distribution.probs.argmax(dim=1)
                 correct += (greedy == self._act_tensor[start : start + 1024]).sum().item()
         self.logger.record("demo/bc_loss", float(np.mean(losses)))
         self.logger.record("demo/bc_accuracy", correct / len(self._actions))

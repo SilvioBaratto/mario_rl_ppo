@@ -72,6 +72,7 @@ class FakeNes(gym.Env):
         self.start_x = start_x
         self.x = start_x
         self.ram = np.zeros(2048, np.uint8)
+        self.screen = np.zeros((4, 4, 3), np.uint8)
         self._is_dying = False
         self.received: list[int] = []
         self.restored: list[int] = []
@@ -106,6 +107,9 @@ class FakeNes(gym.Env):
 
     def _did_reset(self) -> None:
         self.synced += 1
+
+    def _get_info(self) -> dict[str, Any]:
+        return self._info()
 
 
 def route(frames: list[int], goal_x: int, env_id: str = "SuperMarioBros-1-1-v0") -> dict[str, Any]:

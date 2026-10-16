@@ -17,7 +17,7 @@ def _joypad_byte(action: int) -> int:
 def level_route(request: pytest.FixtureRequest) -> tuple[str, dict]:
     """Return a level label and its shipped route."""
     level = request.param
-    return level, a.load_demo_route(f"SuperMarioBros-{level[0]}-{level[2]}-v0")
+    return level, a.require_route(f"SuperMarioBros-{level[0]}-{level[2]}-v0")
 
 
 def test_route_is_recorded_on_the_level_it_is_named_after(level_route) -> None:

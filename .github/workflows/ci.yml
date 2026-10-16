@@ -29,7 +29,7 @@ jobs:
           cache: pip
 
       # Ruff widens its default rules between minor releases (sentinel's CI went red that way),
-      # so the version is banded; keep it in step with the dev tools in the Makefile.
+      # so the version is banded; keep it in step with the dev extra in pyproject.toml.
       - name: Install ruff
         run: python -m pip install --upgrade pip "ruff>=0.17,<0.18"
 
@@ -65,13 +65,12 @@ jobs:
       - name: Install (CPU torch first, then the pinned requirements)
         run: |
           python -m pip install --upgrade pip
-          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1 torchvision==0.29.1
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
           make install
 
-      # The gym wrappers and the optional env returns leave a known baseline of findings, so
-      # pyright reports but does not gate.
-      - name: Pyright (informational)
-        continue-on-error: true
+      # Needs the installed dependencies to resolve gymnasium, SB3 and torch, so it runs here
+      # rather than in the lint job.
+      - name: Pyright
         run: pyright
 
       - name: Tests without the emulator

@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from collections import deque
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import gymnasium as gym
 import numpy as np
@@ -14,11 +14,12 @@ from gymnasium.core import Wrapper
 from mario.domain.config import DEMO_STRIDE, SMB1_FLOAT_STATE
 from mario.domain.levels import level_key
 from mario.domain.routes import demo_start_frames, route_level
+from mario.infrastructure.nes import NesEmulator
 from mario.infrastructure.wrappers import StepReturn
 
 
 def replay_demo_route(
-    nes, route: dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
+    nes: NesEmulator, route: dict[str, Any], stride: int = DEMO_STRIDE, warmup_frames: int = 0
 ) -> dict[int, tuple[Any, list[int], int]]:
     """Replay a demonstration route and collect the states a reverse curriculum can start from.
 
@@ -124,6 +125,9 @@ class FrontierStart(Wrapper):
         self._episode_demo: dict[str, Any] | None = None
         self._forced: deque = deque()
 
+    def _nes(self) -> NesEmulator:
+        return cast(NesEmulator, self.env.unwrapped)
+
     def set_demo_cursor(self, level: str, frame: int | None) -> None:
         """Set the route frame that demo restarts on ``level`` begin from.
 
@@ -137,7 +141,7 @@ class FrontierStart(Wrapper):
         if level not in self._demo_states:
             route = self._demo_routes.get(level)
             self._demo_states[level] = (
-                replay_demo_route(self.env.unwrapped, route, warmup_frames=self.warmup_frames)
+                replay_demo_route(self._nes(), route, warmup_frames=self.warmup_frames)
                 if route
                 else {}
             )
@@ -193,7 +197,7 @@ class FrontierStart(Wrapper):
         Returns:
             (obs, info), or None when that frame ended the episode.
         """
-        nes = self.env.unwrapped
+        nes = self._nes()
         nes.load_state(state)
         # gym-super-mario-bros keeps reward trackers (last time, max x,
         # score, coins) in Python; resync them with the restored RAM or the
@@ -295,7 +299,7 @@ class FrontierStart(Wrapper):
         self._episode_steps += 1
         if level == self._level:
             self._episode_max_x = max(self._episode_max_x, x_pos)
-        nes = self.env.unwrapped
+        nes = self._nes()
         if (
             not (terminated or truncated)
             and not info.get("flag_get")

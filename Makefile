@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Usage:
 #   make                  → show this help
-#   make install          → install the pinned runtime, the package and the dev tools
+#   make install          → install the pinned runtime, the package and the dev extra
 #   make lint             → ruff check + format check + pyright
 #   make test-fast        → the tests that need no emulator
 #   make test-emulator    → the short emulator tests (raw routes, wrapped env, whole game)
@@ -20,7 +20,7 @@ help:
 	@echo ""
 	@echo "Mario RL PPO — available targets"
 	@echo "--------------------------------"
-	@echo "  make install         Install requirements.txt, the package and the dev tools"
+	@echo "  make install         Install requirements.txt, the package and the dev extra"
 	@echo "  make lint            ruff check + ruff format --check + pyright"
 	@echo "  make test-fast       Tests that need no emulator"
 	@echo "  make test-emulator   Short emulator tests (what CI runs besides test-fast)"
@@ -34,8 +34,7 @@ help:
 # for CI and containers. On macOS the default wheel is the right one.
 install:
 	pip install -r requirements.txt
-	pip install --no-deps -e .
-	pip install "ruff>=0.17,<0.18" "pyright>=1.1"
+	pip install -e ".[dev]"
 
 lint:
 	ruff check .

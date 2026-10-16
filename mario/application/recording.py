@@ -61,7 +61,7 @@ def record_game(agent, env, max_steps=RECORD_MAX_STEPS, deterministic=True, stop
 
     # Game summary
     flag_get = info.get("flag_get", False)
-    if stopped:
+    if stopped and stop_at is not None:
         completion_status = f"Reached {stop_at[0]}-{stop_at[1]} (recording stopped)"
     elif flag_get:
         completion_status = "FLAG GET!"

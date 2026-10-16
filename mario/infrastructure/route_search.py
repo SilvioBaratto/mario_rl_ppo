@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from typing import Any, cast
 
 import gym_super_mario_bros
 import numpy as np
@@ -11,6 +12,7 @@ from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
 
 from mario.domain.config import FRAME_SKIP, SMB1_FLOAT_STATE
+from mario.infrastructure.nes import NesEmulator
 
 # SMB1 RAM: area type (0 water, 1 ground, 2 underground, 3 castle) and the
 # pointer of the area being played; together they identify an area of a level.
@@ -25,13 +27,14 @@ CELL_PX = 16
 WAYPOINT_EVERY = 240
 
 
-def _make_raw_env(env_id):
+def _make_raw_env(env_id: str) -> tuple[NesEmulator, dict[int, int]]:
     """Return (raw gym-super-mario-bros env, SIMPLE_MOVEMENT index -> joypad byte)."""
-    nes = gym_super_mario_bros.make(env_id).unwrapped
-    return nes, dict(JoypadSpace(nes, SIMPLE_MOVEMENT)._action_map)
+    raw = gym_super_mario_bros.make(env_id).unwrapped
+    return cast(NesEmulator, raw), dict(JoypadSpace(raw, SIMPLE_MOVEMENT)._action_map)
 
 
-def _agent_step(nes, byte):
+def _agent_step(nes: NesEmulator, byte: int) -> tuple[dict[str, Any], bool]:
+    info: dict[str, Any] = {}
     for _ in range(FRAME_SKIP):
         _, _, terminated, truncated, info = nes.step(byte)
         if terminated or truncated:
@@ -154,6 +157,7 @@ def flag_offsets(env_id, actions, max_noop):
         nes.reset()
         for _ in range(noop):
             nes.step(0)
+        info: dict[str, Any] = {}
         for action in actions:
             info, done = _agent_step(nes, action_map[action])
             if done:
@@ -187,7 +191,8 @@ def build_route(env_id, actions, ok_offsets, max_noop, searches):
     nes, action_map = _make_raw_env(env_id)
     nes.reset()
     frames, xs, grounded = [], [], []
-    info = {}
+    info: dict[str, Any] = {}
+    terminated = truncated = False
     for action in actions:
         for _ in range(FRAME_SKIP):
             _, _, terminated, truncated, info = nes.step(action_map[action])

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, SupportsFloat
 
 import cv2
 import gymnasium as gym
@@ -13,7 +13,7 @@ from gymnasium.core import ObservationWrapper, Wrapper
 
 from mario.domain.config import FRAME_SKIP, HUD_ROWS, NOOP_MAX, OBS_SIZE, STALL_STEPS
 
-StepReturn = tuple[np.ndarray, float, bool, bool, dict[str, Any]]
+StepReturn = tuple[Any, SupportsFloat, bool, bool, dict[str, Any]]
 
 
 NOOP_ACTION = SIMPLE_MOVEMENT.index(["NOOP"])
@@ -54,6 +54,9 @@ class SkipFrame(Wrapper):
 
     def step(self, action: int) -> StepReturn:  # type: ignore[override]
         total_reward = 0.0
+        obs: Any = None
+        terminated = truncated = False
+        info: dict[str, Any] = {}
         for _ in range(self._skip):
             obs, reward, terminated, truncated, info = self.env.step(
                 NOOP_ACTION if self._ending else action

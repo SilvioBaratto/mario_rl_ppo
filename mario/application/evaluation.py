@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import imageio
 import numpy as np
@@ -51,6 +52,7 @@ def evaluate_agent(
         max_x_pos = 0
         action_counts = {}
         progress = GameProgress()
+        info: dict[str, Any] = {}
 
         while not done:
             action, _ = agent.predict(obs, deterministic=deterministic)
@@ -86,6 +88,7 @@ def evaluate_agent(
 
         if record_video and frames:
             status = "COMPLETE" if flag_get else f"dist_{max_x_pos}"
+            assert video_dir is not None, "record_video needs a video_dir"
             video_path = os.path.join(video_dir, f"episode_{episode}_{status}.mp4")
             imageio.mimsave(video_path, frames, fps=30)
             print(f"Video saved to {video_path}")

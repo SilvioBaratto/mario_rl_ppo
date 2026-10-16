@@ -204,7 +204,7 @@ def _scripted_progress() -> dict[str, Any]:
 
 
 def _curriculum_walk(warmup: int) -> dict[str, Any]:
-    routes = [a.load_demo_route(f"SuperMarioBros-{lv[0]}-{lv[2]}-v0") for lv in a.LEVELS]
+    routes = [a.require_route(f"SuperMarioBros-{lv[0]}-{lv[2]}-v0") for lv in a.LEVELS]
     curriculum = a.ReverseCurriculum(routes, warmup_frames=warmup)
     out: dict[str, Any] = {"required": curriculum.required, "start": curriculum.cursors()}
     for level in sorted(curriculum.cursors()):
@@ -228,7 +228,7 @@ def pure_tables() -> dict[str, Any]:
             a.parse_levels(bad)
         except ValueError as exc:
             errors[bad] = str(exc)
-    routes = {lv: a.load_demo_route(f"SuperMarioBros-{lv[0]}-{lv[2]}-v0") for lv in a.LEVELS}
+    routes = {lv: a.require_route(f"SuperMarioBros-{lv[0]}-{lv[2]}-v0") for lv in a.LEVELS}
     starts = {}
     for lv, route in routes.items():
         for warmup in (0, a.demo_warmup_frames(4)):
@@ -276,8 +276,8 @@ def raw_route_replay() -> dict[str, Any]:
     shots: dict[str, Any] = {}
     for lv in a.LEVELS:
         env_id = f"SuperMarioBros-{lv[0]}-{lv[2]}-v0"
-        route = a.load_demo_route(env_id)
-        nes = gym_super_mario_bros.make(env_id).unwrapped
+        route = a.require_route(env_id)
+        nes = a.raw_nes(gym_super_mario_bros.make(env_id))
         try:
             nes.reset()
             expected = {w["frame"]: w["x"] for w in route["waypoints"]}
@@ -306,11 +306,11 @@ def raw_route_replay() -> dict[str, Any]:
 def wrapped_trajectory(level: str, offset: int) -> dict[str, Any]:
     """Play a route's agent actions through the training env after ``offset`` idle frames."""
     env_id = f"SuperMarioBros-{level[0]}-{level[2]}-v0"
-    route = a.load_demo_route(env_id)
+    route = a.require_route(env_id)
     env = a.create_mario_env(env_id, seed=42, noop_max=0)
     try:
         frame, _ = env.reset()
-        nes = env.unwrapped
+        nes = a.raw_nes(env)
         for _ in range(offset):
             nes.step(0)
         if offset:
@@ -345,7 +345,7 @@ def wrapped_trajectory(level: str, offset: int) -> dict[str, Any]:
 
 def game_chain(offset: int) -> dict[str, Any]:
     """Chain the four routes through the whole game, idling through each level end."""
-    routes = [a.load_demo_route(f"SuperMarioBros-1-{s}-v0") for s in (1, 2, 3, 4)]
+    routes = [a.require_route(f"SuperMarioBros-1-{s}-v0") for s in (1, 2, 3, 4)]
     env = a.create_mario_env(
         GAME_ID,
         noop_max=0,
@@ -355,7 +355,7 @@ def game_chain(offset: int) -> dict[str, Any]:
     )
     try:
         frame, info = env.reset()
-        nes = env.unwrapped
+        nes = a.raw_nes(env)
         for _ in range(offset):
             nes.step(0)
         if offset:
@@ -425,7 +425,7 @@ def _wrapper_chain(env: Any) -> list[str]:
 
 def vec_rollout(use_subproc: bool, steps: int = 300) -> dict[str, Any]:
     """Step a mixed-level vec env with scripted actions and hash everything it returns."""
-    env = a.create_vec_env(
+    env: Any = a.create_vec_env(
         num_envs=len(VEC_LEVELS),
         env_id=list(VEC_LEVELS),
         seed=42,
@@ -487,10 +487,10 @@ def same_rollout(left: dict[str, Any], right: dict[str, Any]) -> bool:
 
 def frontier_demo_restarts(steps: int = 200) -> dict[str, Any]:
     """Run frontier and demo restarts in-process with a fixed curriculum cursor."""
-    r13 = a.load_demo_route("SuperMarioBros-1-3-v0")
-    r11 = a.load_demo_route("SuperMarioBros-1-1-v0")
+    r13 = a.require_route("SuperMarioBros-1-3-v0")
+    r11 = a.require_route("SuperMarioBros-1-1-v0")
     warmup = a.demo_warmup_frames(4)
-    env = a.create_vec_env(
+    env: Any = a.create_vec_env(
         num_envs=2,
         env_id=["SuperMarioBros-1-3-v0", "SuperMarioBros-1-1-v0"],
         seed=42,
@@ -505,7 +505,7 @@ def frontier_demo_restarts(steps: int = 200) -> dict[str, Any]:
         env.env_method(
             "set_demo_cursor", "1-1", a.demo_start_frames(r11, a.DEMO_STRIDE, warmup)[-1]
         )
-        base = env
+        base: Any = env
         while hasattr(base, "venv"):
             base = base.venv
         actions = np.random.default_rng(0).integers(0, 7, size=(steps, 2))
@@ -535,7 +535,7 @@ def frontier_demo_restarts(steps: int = 200) -> dict[str, Any]:
 
 def bc_datasets(max_noop: int = 2) -> dict[str, Any]:
     """Behaviour-cloning datasets built from the shipped routes."""
-    routes = [a.load_demo_route(f"SuperMarioBros-1-{s}-v0") for s in (1, 2, 3, 4)]
+    routes = [a.require_route(f"SuperMarioBros-1-{s}-v0") for s in (1, 2, 3, 4)]
     exact, bound = {}, {}
     for name, builder in (("single", a.build_demo_dataset), ("game", a.build_game_demo_dataset)):
         with warnings.catch_warnings(record=True) as caught:
@@ -639,7 +639,7 @@ def policy_behaviour(offsets: tuple[int, ...] = (0, 1, 2, 7, 15, 30)) -> dict[st
             env = a.create_mario_env(env_id, noop_max=0)
             try:
                 frame, _ = env.reset()
-                nes = env.unwrapped
+                nes = a.raw_nes(env)
                 for _ in range(offset):
                     nes.step(0)
                 if offset:

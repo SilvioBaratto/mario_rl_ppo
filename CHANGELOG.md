@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `test-fast`, `test-emulator`, `test-slow`, `smoke`, `docker-check`) and a GitHub Actions
   workflow that runs lint, type-check, tests, a training smoke run and the container checks.
 - `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, issue and pull request templates.
+- `mario.infrastructure.nes.NesEmulator`, a protocol listing the emulator internals the code relies
+  on, and `create_mario_env` overloads; `pyright` reports no findings and gates CI.
 - `mario --version`, and `mario.__version__` read from the installed metadata.
 - A ruff rule that bans a plain `PPO.load`: saved checkpoints only load through
   `load_mario_model`.
@@ -42,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Requirements no longer pin packages the code never imports (`wandb`, `pyyaml`, `torchvision`,
+  `black`, `flake8`); development tools are the `dev` extra.
 - The container's `/app` is writable by the non-root user, so `evaluate` and `record` can write
   their outputs; the compose `evaluate` and `record` services now write into mounted folders.
 
