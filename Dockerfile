@@ -45,8 +45,10 @@ RUN pip install --upgrade pip && \
         torch==2.14.1 torchvision==0.29.1 && \
     pip install -r requirements.txt
 
-# Copy application code
+# Copy application code, then register the package and its `mario` command. The dependencies are
+# already in the layer above, so --no-deps keeps this step instant.
 COPY --chown=mario:mario . .
+RUN pip install --no-deps -e .
 
 # Set SDL to headless mode
 ENV SDL_VIDEODRIVER=dummy \
@@ -56,7 +58,7 @@ ENV SDL_VIDEODRIVER=dummy \
 USER mario
 
 # Default command: show help
-CMD ["python", "train.py", "--help"]
+CMD ["mario", "--help"]
 
 # Example usage:
 # Build:
@@ -64,12 +66,12 @@ CMD ["python", "train.py", "--help"]
 #
 # Train (10M timesteps):
 #   docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-#     python train.py --total-timesteps 10000000 --device cpu --exp-name docker_run
+#     mario train --total-timesteps 10000000 --device cpu --exp-name docker_run
 #
 # Evaluate:
 #   docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-#     python evaluate.py --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
+#     mario evaluate --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
 #
 # Record video:
 #   docker run --rm -v $(pwd)/runs:/app/runs -v $(pwd)/videos:/app/videos mario-rl-ppo \
-#     python play_and_record.py --model-path runs/docker_run/checkpoints/best_model
+#     mario record --model-path runs/docker_run/checkpoints/best_model

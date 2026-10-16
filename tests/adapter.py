@@ -12,10 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import evaluate as _evaluate
-import find_route as _find_route
-import play_and_record as _play_and_record
-import train as _train
+from mario.cli import train as _train
+from mario.cli.app import build_parser
 from mario.domain.config import DEFAULT_ENV_ID, DEMO_STRIDE, FRAME_SKIP, HUD_ROWS, SMB1_FLOAT_STATE
 from mario.domain.curriculum import ReverseCurriculum
 from mario.domain.levels import assign_levels, is_single_stage, level_key, parse_levels
@@ -103,31 +101,27 @@ CONSTANTS: dict[str, Any] = {
 }
 
 # Smallest argv that each command accepts, to read its argparse defaults.
-_CLI: dict[str, tuple[Any, list[str]]] = {
-    "train": (_train, []),
-    "evaluate": (_evaluate, ["--model-path", "model"]),
-    "record": (_play_and_record, ["--model-path", "model"]),
-    "find-route": (_find_route, ["--level", "1-1"]),
+_REQUIRED: dict[str, list[str]] = {
+    "train": [],
+    "evaluate": ["--model-path", "model"],
+    "record": ["--model-path", "model"],
+    "find-route": ["--level", "1-1"],
 }
 
 
 def cli_defaults(command: str) -> dict[str, Any]:
     """Return the parsed namespace of ``command`` when given only its required flags."""
-    module, required = _CLI[command]
-    saved = sys.argv
-    sys.argv = [command, *required]
-    try:
-        return vars(module.parse_args())
-    finally:
-        sys.argv = saved
+    namespace = vars(build_parser().parse_args([command, *_REQUIRED[command]]))
+    namespace.pop("command")
+    namespace.pop("handler")
+    return namespace
 
 
 def cli_command(command: str) -> list[str]:
     """Return the argv prefix that runs ``command`` as a subprocess."""
-    script = {
-        "train": "train.py",
-        "evaluate": "evaluate.py",
-        "record": "play_and_record.py",
-        "find-route": "find_route.py",
-    }[command]
-    return [sys.executable, str(ROOT / script)]
+    return [sys.executable, "-m", "mario", command]
+
+
+def cli_env() -> dict[str, str]:
+    """Return the environment a subprocess needs to import the package from the checkout."""
+    return {"PYTHONPATH": str(ROOT)}

@@ -1,118 +1,23 @@
-"""Simplified training script for Super Mario Bros RL agent using PPO."""
+"""The ``train`` command: train or resume a PPO agent."""
+
+from __future__ import annotations
 
 import argparse
-import os
 import signal
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
-import torch
-from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
-
-# Configure SDL drivers before environment creation
-os.environ["SDL_VIDEODRIVER"] = "dummy"
-os.environ["SDL_AUDIODRIVER"] = "dummy"
-
+from mario.cli.common import configure_sdl, select_device
 from mario.domain.config import DEFAULT_ENV_ID
-from mario.domain.curriculum import ReverseCurriculum
-from mario.domain.levels import assign_levels, parse_levels
-from mario.domain.routes import demo_warmup_frames
-from mario.infrastructure.cloning import (
-    DemoCloningCallback,
-    build_demo_dataset,
-    build_game_demo_dataset,
-)
-from mario.infrastructure.factory import create_eval_env, create_vec_env
-from mario.infrastructure.model import load_mario_model, mario_policy_kwargs
-from mario.infrastructure.route_files import load_demo_route
-from mario.infrastructure.run_logger import setup_logger
 
 LEARNING_RATE = 1e-4
 CLIP_RANGE = 0.2
 
-
-class CheckpointCallback(BaseCallback):
-    """Save the model every ``save_freq`` calls, named by total timesteps.
-
-    Uses the model's timestep counter rather than the call count, so names
-    keep increasing across resumed runs.
-    """
-
-    def __init__(self, save_freq, save_path, verbose=0):
-        super().__init__(verbose)
-        self.save_freq = save_freq
-        self.save_path = Path(save_path)
-        self.save_path.mkdir(parents=True, exist_ok=True)
-
-    def _on_step(self):
-        if self.n_calls % self.save_freq == 0:
-            checkpoint_path = self.save_path / f"checkpoint_{self.num_timesteps}"
-            self.model.save(str(checkpoint_path))
-            if self.verbose > 0:
-                print(f"Checkpoint saved: {checkpoint_path.name}")
-        return True
+DESCRIPTION = "Train Mario RL Agent with PPO (Simplified)"
 
 
-class ReverseCurriculumCallback(BaseCallback):
-    """Run a ``ReverseCurriculum`` against the training workers.
-
-    Reads each finished demo episode's outcome from the VecEnv's reset infos
-    (workers report it on the reset that follows the episode), and pushes the
-    start frame to every worker whenever it moves. TensorBoard gets
-    ``curriculum/<level>_start_frame`` (0 once a level's curriculum is done).
-    """
-
-    def __init__(self, curriculum, logger, verbose=0):
-        super().__init__(verbose)
-        self.curriculum = curriculum
-        self.log = logger
-
-    def _broadcast(self):
-        for level, frame in self.curriculum.cursors().items():
-            self.training_env.env_method("set_demo_cursor", level, frame)
-
-    def _on_training_start(self):
-        self._broadcast()
-
-    def _on_step(self):
-        # Only SubprocVecEnv/DummyVecEnv store reset infos; the wrappers SB3
-        # and create_vec_env add on top keep an unused copy of their own.
-        reset_infos = self.training_env.unwrapped.reset_infos
-        moved = False
-        for done, reset_info in zip(self.locals["dones"], reset_infos):
-            outcome = reset_info.get("demo_outcome") if done else None
-            if outcome is None:
-                continue
-            counts = self.curriculum.record(outcome)
-            if counts is not None:
-                moved = True
-                frame = self.curriculum.cursors()[outcome["level"]]
-                where = (
-                    f"frame {frame}" if frame is not None else "the level start (curriculum done)"
-                )
-                self.log.info(
-                    f"Curriculum {outcome['level']}: {counts[0]}/{counts[1]} reached the "
-                    f"route end from frame {outcome['frame']} (x={outcome['x']}); "
-                    f"now starting from {where} at {self.num_timesteps:,} steps"
-                )
-        if moved:
-            self._broadcast()
-        for level, frame in self.curriculum.cursors().items():
-            self.logger.record(f"curriculum/{level}_start_frame", frame or 0)
-        return True
-
-
-def _raise_keyboard_interrupt(signum, _frame):
-    # Routes SIGTERM (e.g. `docker stop`) through the same save-and-close path as Ctrl+C.
-    raise KeyboardInterrupt(signal.Signals(signum).name)
-
-
-def parse_args():
-    """Parse the training command line."""
-    parser = argparse.ArgumentParser(description="Train Mario RL Agent with PPO (Simplified)")
-
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add this command's flags to ``parser``."""
     parser.add_argument("--env-id", type=str, default=DEFAULT_ENV_ID)
     parser.add_argument(
         "--levels",
@@ -199,7 +104,10 @@ def parse_args():
         help="Path to checkpoint to resume training from (.zip optional)",
     )
 
-    return parser.parse_args()
+
+def _raise_keyboard_interrupt(signum, _frame):
+    # Routes SIGTERM (e.g. `docker stop`) through the same save-and-close path as Ctrl+C.
+    raise KeyboardInterrupt(signal.Signals(signum).name)
 
 
 def setup_directories(exp_name):
@@ -219,24 +127,18 @@ def setup_directories(exp_name):
     return dirs
 
 
-def select_device(device_arg):
-    """Resolve 'auto' to the fastest available device (cuda, then mps, then cpu)."""
-    if device_arg != "auto":
-        return device_arg
-
-    if torch.cuda.is_available():
-        return "cuda"
-    elif torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
-
-
 def create_callbacks(args, dirs, env_ids, curriculum, demo_data, logger):
     """Create training callbacks for checkpointing, evaluation and demonstration learning.
 
     With several levels, each evaluation runs ``--eval-episodes`` episodes on
     every level and ``best_model`` tracks the mean reward across all of them.
     """
+    from stable_baselines3.common.callbacks import EvalCallback
+
+    from mario.infrastructure.callbacks import CheckpointCallback, ReverseCurriculumCallback
+    from mario.infrastructure.cloning import DemoCloningCallback
+    from mario.infrastructure.factory import create_eval_env
+
     callbacks = []
 
     if curriculum is not None:
@@ -289,9 +191,23 @@ def close_quietly(vec_env, logger):
         logger.warning(f"Environment workers already gone during close: {e!r}")
 
 
-def main():
+def run(args: argparse.Namespace) -> int:
     """Train (or resume) a PPO agent; interrupts save an ``interrupted_*`` checkpoint."""
-    args = parse_args()
+    configure_sdl()
+    import numpy as np
+    import torch
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.callbacks import EvalCallback
+
+    from mario.domain.curriculum import ReverseCurriculum
+    from mario.domain.levels import assign_levels, parse_levels
+    from mario.domain.routes import demo_warmup_frames
+    from mario.infrastructure.cloning import build_demo_dataset, build_game_demo_dataset
+    from mario.infrastructure.factory import create_vec_env
+    from mario.infrastructure.model import load_mario_model, mario_policy_kwargs
+    from mario.infrastructure.route_files import load_demo_route
+    from mario.infrastructure.run_logger import setup_logger
+
     env_ids = parse_levels(args.levels) if args.levels else [args.env_id]
 
     # Generate experiment name if not provided
@@ -474,7 +390,7 @@ def main():
                     f"Checkpoint already has {agent.num_timesteps:,} timesteps "
                     f"(target {args.total_timesteps:,}); nothing to train"
                 )
-                return
+                return 0
             logger.info(
                 f"Model loaded at {agent.num_timesteps:,} timesteps, training {remaining:,} more"
             )
@@ -540,7 +456,4 @@ def main():
                 close_quietly(callback.eval_env, logger)
         close_quietly(env, logger)
         logger.info("Environment closed")
-
-
-if __name__ == "__main__":
-    main()
+    return 0

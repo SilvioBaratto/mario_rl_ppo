@@ -15,12 +15,15 @@ import pytest
 
 PACKAGE = Path(__file__).resolve().parents[1] / "mario"
 
-TOP_LEVEL = {"__init__": set()}
+TOP_LEVEL = {"__init__": set(), "__main__": {"cli"}}
 
-# Which mario layers each layer may import (itself always included).
+# Which mario layers each layer may import (itself always included). The adapters in
+# infrastructure satisfy what the application asks of them structurally, so neither needs the other.
 ALLOWED = {
     "domain": set(),
+    "application": {"domain"},
     "infrastructure": {"domain"},
+    "cli": {"domain", "application", "infrastructure"},
 }
 
 # The domain is plain Python plus numpy: no emulator, framework or file access.
@@ -53,7 +56,8 @@ def _package_imports(path: Path, package: Path = PACKAGE) -> set[str]:
         else:
             continue
         for parts in dotted:
-            if len(parts) > 1 and parts[0] == root:
+            # `from mario import __version__` is a module attribute, not a layer.
+            if len(parts) > 1 and parts[0] == root and not parts[1].startswith("_"):
                 names.add(parts[1])
     return names
 
@@ -92,7 +96,7 @@ def test_domain_depends_on_nothing_but_numpy() -> None:
 
 
 def test_top_level_modules_import_only_what_they_may() -> None:
-    """No top-level module hides outside the rule."""
+    """``__main__`` only reaches the CLI, and no top-level module hides outside the rule."""
     modules = {p.stem for p in PACKAGE.glob("*.py")}
     assert modules == set(TOP_LEVEL)
     for name, allowed in TOP_LEVEL.items():

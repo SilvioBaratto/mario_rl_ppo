@@ -17,3 +17,6 @@ eval_videos
 !package.json
 wandb
 .DS_Store
+*.egg-info
+build
+dist

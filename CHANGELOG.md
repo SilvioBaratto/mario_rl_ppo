@@ -19,9 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `test-fast`, `test-emulator`, `test-slow`, `smoke`, `docker-check`) and a GitHub Actions
   workflow that runs lint, type-check, tests, a training smoke run and the container checks.
 - `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, issue and pull request templates.
+- `mario --version`, and `mario.__version__` read from the installed metadata.
+- A ruff rule that bans a plain `PPO.load`: saved checkpoints only load through
+  `load_mario_model`.
 
 ### Changed
 
+- The code is an installable package, `mario`, split into `domain` (pure rules), `application`
+  (use cases), `infrastructure` (wrappers, vec envs, model, files) and `cli`; the 1,049-line
+  `env_factory.py` is gone. `tests/test_layering.py` enforces the dependency rule.
+- One command replaces the four scripts: `mario train`, `mario evaluate`, `mario record` and
+  `mario find-route` (also `python -m mario ...`). The flags and their defaults are unchanged.
+  `train.py`, `evaluate.py`, `play_and_record.py`, `find_route.py` and `setup.py` are removed.
+- Demonstration routes are package data under `mario/infrastructure/demo_routes/`; `pyproject.toml`
+  replaces `setup.py` and carries the pinned dependencies.
 - The code is formatted with `ruff format` (line length 100) and passes `ruff check`; type
   annotations use builtin generics and `X | None`.
 

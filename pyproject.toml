@@ -52,6 +52,9 @@ Issues = "https://github.com/SilvioBaratto/mario_rl_ppo/issues"
 # release must not turn CI red on its own.
 dev = ["pytest>=8.0", "ruff>=0.17,<0.18", "pyright>=1.1"]
 
+[project.scripts]
+mario = "mario.cli.app:main"
+
 [tool.setuptools.packages.find]
 include = ["mario*"]
 
@@ -86,14 +89,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "mario/infrastructure/model.py" = ["TID251"]
-# The entry scripts set SDL_VIDEODRIVER/SDL_AUDIODRIVER before the imports that would
-# initialise pygame or load the emulator.
-"train.py" = ["E402"]
-"evaluate.py" = ["E402"]
-"play_and_record.py" = ["E402"]
-"find_route.py" = ["E402"]
 
 [tool.pyright]
 pythonVersion = "3.13"
 extraPaths = ["."]
-include = ["mario", "tests", "train.py", "evaluate.py", "play_and_record.py", "find_route.py"]
+include = ["mario", "tests"]

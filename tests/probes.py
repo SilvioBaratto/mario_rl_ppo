@@ -674,7 +674,7 @@ def policy_behaviour(offsets: tuple[int, ...] = (0, 1, 2, 7, 15, 30)) -> dict[st
 def _run_cli(
     command: str, args: list[str], workdir: Path, timeout: int = 900
 ) -> subprocess.CompletedProcess:
-    env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
+    env = {**os.environ, **a.cli_env(), "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"}
     return subprocess.run(
         [*a.cli_command(command), *args],
         cwd=workdir,
