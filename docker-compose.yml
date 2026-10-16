@@ -10,7 +10,7 @@ services:
       - SDL_VIDEODRIVER=dummy
       - SDL_AUDIODRIVER=dummy
     command: >
-      python train.py
+      mario train
         --total-timesteps 10000000
         --num-envs 8
         --device cpu
@@ -29,7 +29,7 @@ services:
       - SDL_VIDEODRIVER=dummy
       - SDL_AUDIODRIVER=dummy
     command: >
-      python train.py
+      mario train
         --resume runs/docker_train/checkpoints/best_model.zip
         --total-timesteps 15000000
         --device cpu
@@ -47,9 +47,11 @@ services:
     environment:
       - SDL_VIDEODRIVER=dummy
       - SDL_AUDIODRIVER=dummy
+    # The report is written to the working directory, so run inside the mounted runs/.
+    working_dir: /app/runs
     command: >
-      python evaluate.py
-        --model-path runs/docker_train/checkpoints/best_model
+      mario evaluate
+        --model-path /app/runs/docker_train/checkpoints/best_model
         --n-episodes 10
     profiles:
       - eval
@@ -66,8 +68,9 @@ services:
       - SDL_VIDEODRIVER=dummy
       - SDL_AUDIODRIVER=dummy
     command: >
-      python play_and_record.py
+      mario record
         --model-path runs/docker_train/checkpoints/best_model
+        --output videos/docker_train.mp4
     profiles:
       - record
 

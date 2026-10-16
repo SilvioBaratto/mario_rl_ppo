@@ -55,9 +55,6 @@ mario_gameplay_*.mp4
 *.pkl
 *.zip
 
-# Claude Code guidance
-CLAUDE.md
-
 # Tensorboard
 events.out.tfevents.*
 
@@ -84,4 +81,6 @@ docs/_build/
 !package.json
 !configs/*.yaml
 !configs/*.json
-!src/environments/demo_routes/*.json
+!mario/infrastructure/demo_routes/*.json
+# Golden traces and fixtures of the behaviour-preservation tests must be tracked.
+!tests/**/*.json

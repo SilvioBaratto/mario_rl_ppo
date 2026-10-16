@@ -1,7 +1,7 @@
 # Super Mario Bros RL with PPO
-# Multi-stage build for optimized image size
+# Single-stage image; torch comes from the CPU-only wheel index to keep it small
 
-FROM python:3.13-slim as base
+FROM python:3.13-slim AS base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,20 +31,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash mario
 WORKDIR /app
+# WORKDIR is created as root; evaluate and record write their outputs into it as `mario`.
+RUN chown mario:mario /app
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies. torch/torchvision come from the CPU-only index
-# first: the PyPI Linux wheels pull the multi-GB CUDA toolkit, and the
-# containers train with --device cpu.
+# Install Python dependencies. torch comes from the CPU-only index first: the PyPI
+# Linux wheel pulls the multi-GB CUDA toolkit, and the containers train with
+# --device cpu.
 RUN pip install --upgrade pip && \
-    pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.14.1 torchvision==0.29.1 && \
+    pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1 && \
     pip install -r requirements.txt
 
-# Copy application code
+# Copy application code, then register the package and its `mario` command. The dependencies are
+# already in the layer above, so --no-deps keeps this step instant.
 COPY --chown=mario:mario . .
+RUN pip install --no-deps -e .
 
 # Set SDL to headless mode
 ENV SDL_VIDEODRIVER=dummy \
@@ -54,7 +57,7 @@ ENV SDL_VIDEODRIVER=dummy \
 USER mario
 
 # Default command: show help
-CMD ["python", "train.py", "--help"]
+CMD ["mario", "--help"]
 
 # Example usage:
 # Build:
@@ -62,12 +65,12 @@ CMD ["python", "train.py", "--help"]
 #
 # Train (10M timesteps):
 #   docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-#     python train.py --total-timesteps 10000000 --device cpu --exp-name docker_run
+#     mario train --total-timesteps 10000000 --device cpu --exp-name docker_run
 #
 # Evaluate:
 #   docker run --rm -v $(pwd)/runs:/app/runs mario-rl-ppo \
-#     python evaluate.py --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
+#     mario evaluate --model-path runs/docker_run/checkpoints/best_model --n-episodes 10
 #
 # Record video:
 #   docker run --rm -v $(pwd)/runs:/app/runs -v $(pwd)/videos:/app/videos mario-rl-ppo \
-#     python play_and_record.py --model-path runs/docker_run/checkpoints/best_model
+#     mario record --model-path runs/docker_run/checkpoints/best_model

@@ -1,0 +1,52 @@
+{
+ "exact": {
+  "report": {
+   "levels": {
+    "SuperMarioBros-1-1-v0": {
+     "avg_length": 270.0,
+     "avg_reward": 314.8502197265625,
+     "episode_info": [
+      {
+       "clean_levels": 1,
+       "coins": 1,
+       "flag_get": true,
+       "levels_cleared": 1,
+       "lives_lost": 0,
+       "max_x_pos": 3161,
+       "score": 500,
+       "time": 346
+      },
+      {
+       "clean_levels": 1,
+       "coins": 1,
+       "flag_get": true,
+       "levels_cleared": 1,
+       "lives_lost": 0,
+       "max_x_pos": 3161,
+       "score": 500,
+       "time": 345
+      }
+     ],
+     "episode_lengths": [
+      270,
+      270
+     ],
+     "episode_rewards": [
+      314.8502197265625,
+      314.8502197265625
+     ],
+     "episodes": 2,
+     "max_distance": 3161,
+     "max_reward": 314.8502197265625,
+     "min_reward": 314.8502197265625,
+     "std_length": 0.0,
+     "std_reward": 0.0,
+     "success_rate": 100.0
+    }
+   }
+  },
+  "returncode": 0
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

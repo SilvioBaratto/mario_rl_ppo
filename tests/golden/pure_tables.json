@@ -1,0 +1,344 @@
+{
+ "exact": {
+  "assign_levels": {
+   "mixed_8": [
+    "a",
+    "b",
+    "c",
+    "a",
+    "b",
+    "c",
+    "a",
+    "b"
+   ],
+   "repeat": [
+    "a",
+    "a",
+    "b",
+    "a",
+    "a"
+   ],
+   "single": [
+    "x",
+    "x",
+    "x"
+   ]
+  },
+  "curriculum": {
+   "w0": {
+    "1-1": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 135
+    },
+    "1-2": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 181
+    },
+    "1-3": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 109
+    },
+    "1-4": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 143
+    },
+    "required": 5,
+    "start": {
+     "1-1": 1080,
+     "1-2": 1448,
+     "1-3": 872,
+     "1-4": 1144
+    }
+   },
+   "w12": {
+    "1-1": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 134
+    },
+    "1-2": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 180
+    },
+    "1-3": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 108
+    },
+    "1-4": {
+     "counts_head": [
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ],
+      [
+       5,
+       5
+      ]
+     ],
+     "end": null,
+     "moves": 142
+    },
+    "required": 5,
+    "start": {
+     "1-1": 1080,
+     "1-2": 1448,
+     "1-3": 872,
+     "1-4": 1144
+    }
+   }
+  },
+  "demo_start_frames": {
+   "1-1/w0": [
+    8,
+    1080,
+    135
+   ],
+   "1-1/w12": [
+    16,
+    1080,
+    134
+   ],
+   "1-2/w0": [
+    8,
+    1448,
+    181
+   ],
+   "1-2/w12": [
+    16,
+    1448,
+    180
+   ],
+   "1-3/w0": [
+    8,
+    872,
+    109
+   ],
+   "1-3/w12": [
+    16,
+    872,
+    108
+   ],
+   "1-4/w0": [
+    8,
+    1144,
+    143
+   ],
+   "1-4/w12": [
+    16,
+    1144,
+    142
+   ]
+  },
+  "demo_warmup_frames": {
+   "1": 0,
+   "2": 4,
+   "4": 12,
+   "5": 16
+  },
+  "episode_end_reason": [
+   "Stalled (no progress)",
+   "Time limit",
+   "Died",
+   "Stalled (no progress)"
+  ],
+  "game_progress": {
+   "clean_two_levels": {
+    "clean_levels": null,
+    "levels": [
+     [
+      1,
+      1
+     ],
+     [
+      1,
+      2
+     ]
+    ],
+    "levels_cleared": 2,
+    "lives_lost": 0,
+    "summary": "reached 1-2, cleared 2 level(s), 0 lives lost, 2 level(s) cleared before the first life lost"
+   },
+   "death_then_stall": {
+    "clean_levels": 0,
+    "levels": [
+     [
+      1,
+      1
+     ]
+    ],
+    "levels_cleared": 0,
+    "lives_lost": 1,
+    "summary": "reached 1-1, cleared 0 level(s), 1 life lost, 0 level(s) cleared before the first life lost"
+   },
+   "final_death_wraps_life": {
+    "clean_levels": 0,
+    "levels": [
+     [
+      1,
+      1
+     ]
+    ],
+    "levels_cleared": 0,
+    "lives_lost": 1,
+    "summary": "reached 1-1, cleared 0 level(s), 1 life lost, 0 level(s) cleared before the first life lost"
+   },
+   "time_limit": {
+    "clean_levels": null,
+    "levels": [
+     [
+      1,
+      1
+     ]
+    ],
+    "levels_cleared": 0,
+    "lives_lost": 0,
+    "summary": "reached 1-1, cleared 0 level(s), 0 lives lost, 0 level(s) cleared before the first life lost"
+   }
+  },
+  "is_single_stage": {
+   "SuperMarioBros-1-1-v0": true,
+   "SuperMarioBros-8-4-v3": true,
+   "SuperMarioBros-v0": false,
+   "x": false
+  },
+  "level_key": "1-3",
+  "parse_levels": {
+   " 1-1 , game ": [
+    "SuperMarioBros-1-1-v0",
+    "SuperMarioBros-v0"
+   ],
+   "1-1": [
+    "SuperMarioBros-1-1-v0"
+   ],
+   "1-1,1-2,1-3": [
+    "SuperMarioBros-1-1-v0",
+    "SuperMarioBros-1-2-v0",
+    "SuperMarioBros-1-3-v0"
+   ],
+   "8-4": [
+    "SuperMarioBros-8-4-v0"
+   ],
+   "game": [
+    "SuperMarioBros-v0"
+   ]
+  },
+  "parse_levels_errors": {
+   "": "Invalid level ''; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "0-1": "Invalid level '0-1'; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "1-1,": "Invalid level ''; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "1-5": "Invalid level '1-5'; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "1_1": "Invalid level '1_1'; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "9-1": "Invalid level '9-1'; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'",
+   "x": "Invalid level 'x'; expected WORLD-STAGE like 1-2 (world 1-8, stage 1-4) or 'game'"
+  },
+  "route_level": {
+   "1-1": "1-1",
+   "1-2": "1-2",
+   "1-3": "1-3",
+   "1-4": "1-4"
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

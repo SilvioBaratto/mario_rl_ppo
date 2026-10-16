@@ -1,31 +1,28 @@
-# Core dependencies (9.x requires Python >= 3.13)
+# Exact pins of the runtime that the golden traces and trained checkpoints were made with.
+# The dependencies in pyproject.toml are a subset of these; tests/test_packaging.py keeps
+# the two in step. The Docker image and CI install from here, torch first from the CPU index.
+# Development tools (pytest, ruff, pyright) are the `dev` extra of pyproject.toml.
+
+# Emulator (9.x requires Python >= 3.13)
 gym-super-mario-bros==9.1.0
 nes-py==9.0.1
 
-# Deep Learning
+# Deep learning
 torch==2.14.1
-torchvision==0.29.1
 numpy==2.5.4
 
-# Reinforcement Learning
+# Reinforcement learning
 stable-baselines3[extra]==2.9.0
 gymnasium==1.4.0
 
-# Visualization and Monitoring
-tensorboard==2.21.0
-matplotlib==3.11.2
+# Observations, videos and logs
 opencv-python==5.0.0.93
-Pillow==12.3.0
-
-# Utilities
-tqdm==4.70.1
-pyyaml==6.0.3
-pandas==3.0.6
-wandb==0.30.0
 imageio==2.38.1
 imageio-ffmpeg==0.6.0
+tensorboard==2.21.0
+tqdm==4.70.1
 
-# Development (optional)
-pytest==9.1.1
-black==26.10.1
-flake8==7.4.1
+# Pulled in by Stable Baselines3, pinned so a rollout's numerics do not drift
+matplotlib==3.11.2
+pandas==3.0.6
+Pillow==12.3.0

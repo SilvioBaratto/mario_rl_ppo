@@ -1,0 +1,174 @@
+{
+ "exact": {
+  "1-1/0": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-1/1": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-1/15": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-1/2": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-1/30": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-1/7": {
+   "actions": "63553231909295a47103ae9f5d572ac01a499c23b19f29fc83449be7f311029f",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 270
+  },
+  "1-2/0": {
+   "actions": "7e99b01d00a3ccdceb18949800ffc9eccd8af427f130f3ac9395c91d4571217a",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 363
+  },
+  "1-2/1": {
+   "actions": "7e99b01d00a3ccdceb18949800ffc9eccd8af427f130f3ac9395c91d4571217a",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 363
+  },
+  "1-2/15": {
+   "actions": "e41099cca0d38c20e5ab60f829198a6f4ccba4fc60bcd33f6bab147efa222981",
+   "ended": "terminated",
+   "flag": false,
+   "max_x": 2156,
+   "steps": 291
+  },
+  "1-2/2": {
+   "actions": "7e99b01d00a3ccdceb18949800ffc9eccd8af427f130f3ac9395c91d4571217a",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 363
+  },
+  "1-2/30": {
+   "actions": "7e99b01d00a3ccdceb18949800ffc9eccd8af427f130f3ac9395c91d4571217a",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 363
+  },
+  "1-2/7": {
+   "actions": "7e99b01d00a3ccdceb18949800ffc9eccd8af427f130f3ac9395c91d4571217a",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 3161,
+   "steps": 363
+  },
+  "1-3/0": {
+   "actions": "2134d294bd70d12aeef82f0c4b3d77a5944ff3fc9f953501da477d121053e78c",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 219
+  },
+  "1-3/1": {
+   "actions": "e54622f8f18123019ed2bef19bde9275f98895d43da3de069bafe4928e11533e",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 213
+  },
+  "1-3/15": {
+   "actions": "942f898e4891b73de4c324a4a39b6a6bd11d381c52dd12f855e4a5afd197e7d7",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 213
+  },
+  "1-3/2": {
+   "actions": "2134d294bd70d12aeef82f0c4b3d77a5944ff3fc9f953501da477d121053e78c",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 219
+  },
+  "1-3/30": {
+   "actions": "2134d294bd70d12aeef82f0c4b3d77a5944ff3fc9f953501da477d121053e78c",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 219
+  },
+  "1-3/7": {
+   "actions": "9657669903d5ba1f27508ba9d556873a72f1415249681884d17f1c0bf3f64f23",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2425,
+   "steps": 213
+  },
+  "1-4/0": {
+   "actions": "7c0224fc50ac83211f055398b75a90d67bd28efef04fa0b8ad24a98e41cdf25e",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2244,
+   "steps": 288
+  },
+  "1-4/1": {
+   "actions": "7c0224fc50ac83211f055398b75a90d67bd28efef04fa0b8ad24a98e41cdf25e",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2244,
+   "steps": 288
+  },
+  "1-4/15": {
+   "actions": "d1c53489faae0d6cd3e49e41f89e5c14c2ac05b0774e792d353f355a658ed95b",
+   "ended": "terminated",
+   "flag": false,
+   "max_x": 1935,
+   "steps": 248
+  },
+  "1-4/2": {
+   "actions": "7c0224fc50ac83211f055398b75a90d67bd28efef04fa0b8ad24a98e41cdf25e",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2244,
+   "steps": 288
+  },
+  "1-4/30": {
+   "actions": "7c0224fc50ac83211f055398b75a90d67bd28efef04fa0b8ad24a98e41cdf25e",
+   "ended": "terminated",
+   "flag": true,
+   "max_x": 2244,
+   "steps": 288
+  },
+  "1-4/7": {
+   "actions": "d1c53489faae0d6cd3e49e41f89e5c14c2ac05b0774e792d353f355a658ed95b",
+   "ended": "terminated",
+   "flag": false,
+   "max_x": 1935,
+   "steps": 248
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {}
+}

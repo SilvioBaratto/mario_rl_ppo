@@ -1,0 +1,41 @@
+{
+ "exact": {
+  "game": {
+   "actions": "87629774cc1a8e720ae8aca4938fe20852f869e53e4c94216456a4440c9d6adb",
+   "obs_shape": [
+    1089,
+    4,
+    84,
+    84
+   ],
+   "pairs": 1089,
+   "warnings": [
+    "game chain after 0 NOOP frames: SuperMarioBros-1-3-v0 route fails from the whole-game entry (x=1064); stopping that chain",
+    "game chain after 1 NOOP frames: SuperMarioBros-1-3-v0 route fails from the whole-game entry (x=1064); stopping that chain",
+    "game chain after 2 NOOP frames: SuperMarioBros-1-3-v0 route fails from the whole-game entry (x=1064); stopping that chain"
+   ]
+  },
+  "single": {
+   "actions": "c831e40dd1ee2cfa370f19d39a1e75b157e7b4c21134f025763b954ad4e4919c",
+   "obs_shape": [
+    3201,
+    4,
+    84,
+    84
+   ],
+   "pairs": 3201,
+   "warnings": [
+    "SuperMarioBros-1-3-v0 agent_actions miss the route end after 1 NOOP frames (x=1724, goal 2425); skipping that offset"
+   ]
+  }
+ },
+ "platform": "darwin-arm64",
+ "platform_bound": {
+  "game": {
+   "obs": "ada8b960d9fa8bb10dff26c6a84a88190fffcdcc722d1876a9344f565661f3e1"
+  },
+  "single": {
+   "obs": "97741ab7f8b83929981445b86f4c940d112acb5877654fc50263e9fcc89ccc3e"
+  }
+ }
+}
